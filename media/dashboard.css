@@ -435,11 +435,37 @@ body {
   flex: none;
 }
 
-/* One setting per row: label, control, then the description and the
- * source. The label is the setting key, because that is what the reader
- * sees in Settings and what they will search for. */
+/* The Config view scrolls inside the panel.
+ *
+ * `#app` is a column flexbox at 100% height, so this section is a flex child
+ * that would otherwise grow past the viewport and push its own bottom out of
+ * reach. `flex: 1` plus `min-height: 0` is what lets `overflow-y` engage: a
+ * flex item's default `min-height: auto` refuses to shrink below its content,
+ * and the scrollbar never appears. */
+.config-section {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 16px;
+  margin-bottom: 0;
+}
+
+/* One setting per row: `[name] [control] [description] [save]`.
+ *
+ * A block layout stretched every input to the panel's full width, so a number
+ * box and a two-word dropdown looked identical and the Save button sat under
+ * the description instead of where the reading order ends. The grid gives the
+ * control a bounded column and right-aligns the action column, which is what
+ * puts the two words of a setting and its Save button on one line.
+ *
+ * Measured on a 590px row: label 157px, control 143px, description 215px,
+ * Save 45px. Before this the control was the whole row's width. */
 .config-field {
-  padding: 8px 0;
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(110px, 0.9fr) minmax(0, 1.8fr) auto;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 6px 0;
   border-bottom: 1px solid var(--vscode-panel-border);
 }
 
@@ -451,14 +477,16 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   font-size: 11px;
   font-weight: 600;
-  margin-bottom: 4px;
+  overflow-wrap: anywhere;
 }
 
 /* The "modified" badge. It marks the settings that differ from the
  * extension's default, which is the thing a reader wants to find. */
 .config-modified {
+  flex: none;
   font-size: 9px;
   font-weight: 400;
   text-transform: uppercase;
@@ -469,19 +497,40 @@ body {
   background-color: var(--vscode-badge-background);
 }
 
-.config-control-row {
+/* The description wraps rather than truncating. Measured at the panel's
+ * default 590px row: a single line held 215px, which cut five of the eight
+ * descriptions in half and made the column decoration. Two lines fit, so the
+ * row grows a little and the reader keeps the sentence. */
+.config-description {
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* The action column. The buttons do not wrap: a two-button row that wraps to
+ * two lines would change the row height and break the column alignment. The
+ * column is right-aligned, so the destructive Clear sits at the far edge and
+ * Save steps left only on the rows that have both. */
+.config-actions {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.config-actions .config-save {
+  flex: none;
+  white-space: nowrap;
 }
 
 /* The inputs use the theme's own input colours, so they look like every
- * other input in the editor. */
-.config-control-row input[type="text"],
-.config-control-row input[type="number"],
-.config-control-row input[type="password"],
-.config-control-row select {
-  flex: 1;
+ * other input in the editor. They are the only control that is a direct
+ * child of the row; the checkbox is the exception below. */
+.config-field > input[type="text"],
+.config-field > input[type="number"],
+.config-field > input[type="password"],
+.config-field > select {
+  width: 100%;
   min-width: 0;
   padding: 3px 6px;
   font-size: 11px;
@@ -492,39 +541,28 @@ body {
   border-radius: 2px;
 }
 
-.config-control-row input:focus,
-.config-control-row select:focus {
+.config-field > input:focus,
+.config-field > select:focus {
   outline: 1px solid var(--vscode-focusBorder);
   outline-offset: -1px;
 }
 
-.config-control-row input[type="checkbox"] {
-  flex: none;
+/* A checkbox is its own width, not the column's. */
+.config-field > input[type="checkbox"] {
+  justify-self: start;
   margin: 0;
 }
 
-.config-control-row .config-save {
-  flex: none;
-  white-space: nowrap;
-}
-
-.config-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  margin-top: 4px;
-  font-size: 11px;
-  color: var(--vscode-descriptionForeground);
-}
-
+/* The source and a failed edit are about the setting, not about one column of
+ * it, so they take the whole row. */
 .config-scope-of {
+  grid-column: 1 / -1;
   font-size: 10px;
   opacity: 0.8;
 }
 
-/* The message from a failed edit, next to the control that failed. */
 .config-error {
-  margin-top: 4px;
+  grid-column: 1 / -1;
   font-size: 11px;
   color: var(--vscode-errorForeground);
 }

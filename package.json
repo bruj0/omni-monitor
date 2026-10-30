@@ -135,14 +135,10 @@
           "default": true,
           "description": "Show the quota status bar item."
         },
-        "omniMonitor.statusBarMode": {
+        "omniMonitor.statusBarProvider": {
           "type": "string",
           "default": "worst",
-          "enum": [
-            "worst",
-            "sum"
-          ],
-          "description": "worst shows the lowest remaining percentage across connections."
+          "description": "Which provider the status bar's bar and percentage read. Nothing chosen (the stored default) reads the lowest remaining percentage across every connection; otherwise a provider name, e.g. `minimax`. Pick from the dashboard's Settings page."
         },
         "omniMonitor.alerts": {
           "type": "boolean",

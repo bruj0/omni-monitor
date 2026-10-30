@@ -50,11 +50,37 @@ export function humanizeWindow(key: string): string {
 }
 
 /**
+ * The bar glyphs for the status bar.
+ *
+ * Ten segments: a solid rectangle for the percent remaining, an outlined one
+ * for what is spent. Adjacent glyphs join, so the meter renders as one
+ * continuous bar — solid on the left, outlined on the right — rather than as
+ * separate characters.
+ *
+ * The pair was chosen against the live bar, three times. `░` renders as a dot
+ * grid, `▰` renders striped in the status bar's font, and the `●`/`○` discs
+ * read as detached beads rather than as a bar — rejected by the reader they
+ * were built for. `▬`/`▭` is the only pair tried whose filled and empty
+ * halves are unmistakable AND join into one shape.
+ *
+ * Pure text on purpose. A status bar item cannot colour one glyph, so the
+ * fill is what carries the *amount* and the item's own background colour
+ * (set from the severity, in `shell/statusBar.ts`) carries the *level*.
+ */
+export function quotaBar(percentRemaining: number, segments = 10): string {
+  const clamped = Math.max(0, Math.min(100, percentRemaining));
+  const filled = Math.round((clamped / 100) * segments);
+  return "▬".repeat(filled) + "▭".repeat(segments - filled);
+}
+
+/**
  * Status bar text.
  *
- * Shows the worst-case remaining percentage. When exactly one connection
- * reports a percentage, append its provider name so the number has a subject;
- * with several, the number alone is already ambiguous enough.
+ * An icon, the quota bar for the selected provider, and the same number as
+ * text — the bar is the shape, the number is the fact. The provider name is
+ * appended only when a name is supplied: with the `worst` selection the
+ * number is already the worst case and naming one provider would suggest
+ * the bar read only that one.
  */
 export function statusBarText(options: {
   percentRemaining: number | null;
@@ -64,5 +90,5 @@ export function statusBarText(options: {
   if (!options.reachable) return "$(circle-outline) OmniRoute";
   if (options.percentRemaining === null) return "$(layers-dot) OmniRoute";
   const suffix = options.soleProviderName ? ` ${options.soleProviderName}` : "";
-  return `$(layers) OmniRoute ${options.percentRemaining}%${suffix}`;
+  return `$(layers) ${quotaBar(options.percentRemaining)} ${options.percentRemaining}%${suffix}`;
 }

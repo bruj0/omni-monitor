@@ -88,6 +88,37 @@ export function worstCaseRemaining(providers: UsageSnapshot[]): number | null {
   return worst;
 }
 
+/**
+ * One named provider's read, or null.
+ *
+ * The provider is matched case-insensitively — the setting is typed by a
+ * reader and the server varies its capitalisation — and the percent is that
+ * provider's own worst window, so one slow window inside the provider still
+ * shows.
+ *
+ * Returns `null` for a name nothing reports, on purpose: the status bar's
+ * fallback for `null` is a bare icon, and a number that silently means
+ * "some other provider" would make the bar lie.
+ */
+export interface ProviderRead {
+  /** The provider's own name as the server reported it. */
+  name: string;
+  percent: number | null;
+}
+
+export function providerRead(
+  providers: UsageSnapshot[],
+  name: string,
+): ProviderRead | null {
+  const target = name.trim().toLowerCase();
+  if (target === "") return null;
+  const provider = providers.find(
+    (p) => p.provider.trim().toLowerCase() === target,
+  );
+  if (!provider) return null;
+  return { name: provider.provider, percent: worstCaseRemaining([provider]) };
+}
+
 export type Severity = "ok" | "warning" | "critical";
 
 /**

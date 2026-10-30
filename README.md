@@ -10,14 +10,18 @@ how models are routed.
 
 ## What it shows
 
-**Status bar** — the lowest remaining percentage across every connection:
+**Status bar** — a bar of the quota remaining, solid on the left for what is
+left and outlined for what is spent, with the same number as text. With no
+provider chosen it reads the smallest remaining percentage across every
+connection; otherwise one provider, chosen from the dashboard's Settings page:
 
 ```
-$(layers) OmniRoute 68%
+$(layers) ▬▬▬▬▬▬▬▭▭▭ 68%
 ```
 
-Warns at 20% remaining, critical at 5%. Hover for per-connection windows,
-reset countdowns, and your key's own daily and weekly spend.
+Warns at 20% remaining, critical at 5%; the item's background turns yellow,
+then red. Hover for the reading the bar made, per-connection windows, reset
+countdowns, and your key's own daily and weekly spend.
 
 **Dashboard** — an Activity Bar panel mirroring GCMP's `usagesView`:
 

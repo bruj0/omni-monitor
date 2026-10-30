@@ -1487,7 +1487,19 @@ function renderConfigSettings(settings: ConfigSetting[]): HTMLElement {
   return wrapper;
 }
 
-/** One setting: its label, its control, and its description. */
+/**
+ * One setting, laid out as a single row:
+ * `[name] [control] [description] [save]`.
+ *
+ * A block layout stretched every input to the panel's full width, which made
+ * a number box and a two-word dropdown look identical and pushed the Save
+ * button off the reader's eye line. The row keeps the control near the name
+ * it belongs to and puts the action where the reading order ends. The row's
+ * fourth column is fixed, so every Save button lines up down the form.
+ *
+ * The scope and any error span the whole row: they are about the setting, not
+ * about one column of it.
+ */
 function renderConfigField(setting: ConfigSetting): HTMLElement {
   const field = document.createElement("div");
   field.className = "config-field";
@@ -1510,25 +1522,25 @@ function renderConfigField(setting: ConfigSetting): HTMLElement {
   }
   field.appendChild(label);
 
-  const control = renderConfigControl(setting);
-  field.appendChild(control);
+  field.appendChild(renderConfigControl(setting));
 
-  const meta = document.createElement("div");
-  meta.className = "config-meta";
+  // The description sits between the control and the Save button, so a
+  // reader sees what the setting does next to the box they are changing.
+  const description = document.createElement("div");
+  description.className = "config-description";
+  description.textContent = setting.description;
+  description.title = setting.description;
+  field.appendChild(description);
 
-  if (setting.description) {
-    const description = document.createElement("span");
-    description.className = "config-description";
-    description.textContent = setting.description;
-    meta.appendChild(description);
-  }
+  const actions = document.createElement("div");
+  actions.className = "config-actions";
+  actions.appendChild(configSaveButton(setting.key, "Save"));
+  field.appendChild(actions);
 
   const scope = document.createElement("span");
   scope.className = "config-scope-of";
   scope.textContent = `source: ${setting.scope}`;
-  meta.appendChild(scope);
-
-  field.appendChild(meta);
+  field.appendChild(scope);
 
   const error = state.config.errors[setting.key];
   if (error) {
@@ -1543,20 +1555,21 @@ function renderConfigField(setting: ConfigSetting): HTMLElement {
 }
 
 /**
- * The control for one setting.
+ * The control for one setting, as a bare element.
  *
- * A boolean is a checkbox that applies on change. The others are inputs
- * with a Save button, because a text box that writes on every keystroke
- * would fight the reader: the value goes into the settings file as they
- * type, and there is no way to back out of a half-typed value.
+ * It returns the input itself, not a wrapper: the row in `renderConfigField`
+ * owns the layout and the Save button, and a control that brought its own
+ * wrapper and its own button put two Save buttons in every row.
+ *
+ * A boolean is a checkbox that applies on change. The others are inputs that
+ * wait for the row's Save button, because a text box that writes on every
+ * keystroke would fight the reader: the value goes into the settings file as
+ * they type, and there is no way to back out of a half-typed value.
  */
 function renderConfigControl(setting: ConfigSetting): HTMLElement {
   const id = `config-${setting.key}`;
 
   if (setting.control === "boolean") {
-    const row = document.createElement("div");
-    row.className = "config-control-row";
-
     const input = document.createElement("input");
     input.type = "checkbox";
     input.id = id;
@@ -1571,16 +1584,8 @@ function renderConfigControl(setting: ConfigSetting): HTMLElement {
         target: state.config.target,
       });
     });
-
-    row.appendChild(input);
-    row.appendChild(configSaveButton(setting.key, "Apply"));
-    return row;
+    return input;
   }
-
-  const row = document.createElement("div");
-  row.className = "config-control-row";
-
-  let input: HTMLInputElement | HTMLSelectElement;
 
   if (setting.control === "enum" && setting.enumValues) {
     const select = document.createElement("select");
@@ -1594,26 +1599,36 @@ function renderConfigControl(setting: ConfigSetting): HTMLElement {
       if (option === String(setting.value)) element.selected = true;
       select.appendChild(element);
     }
-    input = select;
-  } else {
-    const box = document.createElement("input");
-    box.type = setting.control === "number" ? "number" : "text";
-    box.id = id;
-    box.setAttribute("data-setting", setting.key);
-    box.setAttribute("data-control", setting.control);
-    if (setting.control === "number") {
-      if (setting.minimum !== undefined) box.min = String(setting.minimum);
-      if (setting.maximum !== undefined) box.max = String(setting.maximum);
-      box.value = String(setting.value ?? "");
-    } else {
-      box.value = String(setting.value ?? "");
+
+    // The stored value may not be one of the options — most often the
+    // manifest's default, which the payload's list deliberately omits.
+    // A select whose value matches nothing displays blank, which reads as a
+    // broken form. One synthetic row carries the stored value as the state,
+    // and is disabled so it cannot be re-chosen: it describes, it does not
+    // offer.
+    const text = String(setting.value);
+    if (!setting.enumValues.includes(text)) {
+      const state = document.createElement("option");
+      state.value = text;
+      state.textContent = `nothing chosen (${text})`;
+      state.selected = true;
+      state.disabled = true;
+      select.insertBefore(state, select.firstChild);
     }
-    input = box;
+    return select;
   }
 
-  row.appendChild(input);
-  row.appendChild(configSaveButton(setting.key, "Save"));
-  return row;
+  const box = document.createElement("input");
+  box.type = setting.control === "number" ? "number" : "text";
+  box.id = id;
+  box.setAttribute("data-setting", setting.key);
+  box.setAttribute("data-control", setting.control);
+  if (setting.control === "number") {
+    if (setting.minimum !== undefined) box.min = String(setting.minimum);
+    if (setting.maximum !== undefined) box.max = String(setting.maximum);
+  }
+  box.value = String(setting.value ?? "");
+  return box;
 }
 
 /**
@@ -1693,23 +1708,31 @@ function renderConfigCredentialField(
 
   field.appendChild(label);
 
-  const row = document.createElement("div");
-  row.className = "config-control-row";
-
   const input = document.createElement("input");
   input.type = "password";
   input.id = `credential-${which}`;
   input.placeholder = "Paste a key, then save";
   input.autocomplete = "off";
   input.setAttribute("data-credential-input", which);
-  row.appendChild(input);
+  field.appendChild(input);
+
+  const description = document.createElement("div");
+  description.className = "config-description";
+  description.textContent = credential.scopeNeeded;
+  description.title = credential.scopeNeeded;
+  field.appendChild(description);
+
+  // Save and Clear share the actions column, so the two credential rows line
+  // up with the settings rows above them.
+  const actions = document.createElement("div");
+  actions.className = "config-actions";
 
   const save = document.createElement("button");
   save.className = "button config-save";
   save.setAttribute("data-command", "saveCredential");
   save.setAttribute("data-value", which);
   save.textContent = "Save";
-  row.appendChild(save);
+  actions.appendChild(save);
 
   if (credential.set) {
     const clear = document.createElement("button");
@@ -1717,18 +1740,10 @@ function renderConfigCredentialField(
     clear.setAttribute("data-command", "clearCredential");
     clear.setAttribute("data-value", which);
     clear.textContent = "Clear";
-    row.appendChild(clear);
+    actions.appendChild(clear);
   }
 
-  field.appendChild(row);
-
-  const meta = document.createElement("div");
-  meta.className = "config-meta";
-  const scope = document.createElement("span");
-  scope.className = "config-scope-of";
-  scope.textContent = credential.scopeNeeded;
-  meta.appendChild(scope);
-  field.appendChild(meta);
+  field.appendChild(actions);
 
   const error = state.config.errors[which];
   if (error) {

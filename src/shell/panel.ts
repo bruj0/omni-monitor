@@ -33,6 +33,8 @@ import {
   updateSetting,
 } from "./configPayload";
 import type { ConfigSetting, CredentialState } from "./configPayload";
+import type { StatusState } from "./statusBar";
+import type { UsageSnapshot } from "../core/usage";
 import type { AnalyticsEnvelope, Range, RequestLogRow } from "../core/analytics";
 import { isRange } from "../core/analytics";
 import { hourlyBuckets, type HourlyBucket } from "../core/hourly";
@@ -142,6 +144,27 @@ export class DashboardPanel implements vscode.WebviewViewProvider {
   private range: Range;
   private page = 0;
   private viewMode: ViewMode;
+
+  /**
+   * Where the Config view's provider dropdown gets its options.
+   *
+   * The status bar owns the self-service snapshot the bar reads, so its
+   * provider names are the ones that mean something in a dropdown. Set by
+   * `activate` after both are constructed; before that the dropdown degrades
+   * to a text box, which is what an absent list should render as.
+   */
+  private providerSource: (() => StatusState | undefined) | undefined;
+
+  /**
+   * Give the panel the source of the provider list.
+   *
+   * A function rather than the StatusBar itself keeps this constructor free of
+   * a second class in its parameter list and lets the caller decide what "the
+   * providers" means.
+   */
+  setProviderSource(source: () => StatusState | undefined): void {
+    this.providerSource = source;
+  }
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -256,7 +279,12 @@ export class DashboardPanel implements vscode.WebviewViewProvider {
    * set, and a short hint that tells two keys apart.
    */
   private async loadConfig(): Promise<void> {
-    const payload = await readConfigPayload(this.context);
+    // The providers the dropdown lists: the status bar's own snapshot when
+    // it is ready, so a choice in the list is a choice the bar can read.
+    const state = this.providerSource?.();
+    const providers: UsageSnapshot[] =
+      state && state.kind === "ready" ? state.providers : [];
+    const payload = await readConfigPayload(this.context, { providers });
     this.post({ kind: "config", ...payload });
   }
 

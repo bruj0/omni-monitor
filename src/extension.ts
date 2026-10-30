@@ -34,6 +34,13 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
+  // The Config view's provider dropdown lists the names the status bar
+  // reported last, so a choice in the list is one the bar can read back.
+  panel.setProviderSource(() => {
+    const state = statusBar.current();
+    return state.kind === "ready" ? state : undefined;
+  });
+
   // Feed the alert evaluator from the status bar's own poll. The alert reads
   // a snapshot rather than making its own request, so there is exactly one
   // poll per interval regardless of how many consumers there are.

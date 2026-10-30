@@ -8,10 +8,16 @@
 
 import * as vscode from "vscode";
 import { formatResetIn, formatUsd, humanizeWindow, statusBarText } from "../core/format";
-import { severityFor, soonestReset, windowPercentLeft, worstCaseRemaining } from "../core/percent";
+import {
+  providerRead,
+  severityFor,
+  soonestReset,
+  windowPercentLeft,
+  worstCaseRemaining,
+} from "../core/percent";
 import type { Severity } from "../core/percent";
 import type { UsageLimitStatus, UsageSnapshot } from "../core/usage";
-import { apiKey, baseUrl, refreshSeconds, statusBarEnabled } from "./config";
+import { apiKey, baseUrl, refreshSeconds, statusBarEnabled, statusBarProvider } from "./config";
 import { fetchUsage } from "./client";
 
 /** Every state the item can show, kept explicit so the renderer is total. */
@@ -28,6 +34,10 @@ export type StatusState =
       severity: Severity;
       providers: UsageSnapshot[];
       personal: UsageLimitStatus | null;
+      /** The selection the number was read from: `"worst"` or a provider name, lowercased. */
+      selection: string;
+      /** The provider's own name as the server spelt it, or null under `worst`. */
+      selectedName: string | null;
     };
 
 export class StatusBar implements vscode.Disposable {
@@ -92,7 +102,18 @@ export class StatusBar implements vscode.Disposable {
         return;
       }
 
-      const percent = worstCaseRemaining(view.providers);
+      // The number the bar reads: the selection's own provider, or the
+      // worst window across every connection. A name nothing reports
+      // answers null and shows the bare dot, never another provider's
+      // number — the setting is the reader's choice, not a hint.
+      const selection = statusBarProvider();
+      const read = selection === "worst" ? null : providerRead(view.providers, selection);
+
+      const percent =
+        selection === "worst"
+          ? worstCaseRemaining(view.providers)
+          : (read?.percent ?? null);
+
       if (view.providers.length === 0 && !view.personal) {
         this.setState({ kind: "empty" });
         return;
@@ -104,6 +125,8 @@ export class StatusBar implements vscode.Disposable {
         severity: severityFor(percent),
         providers: view.providers,
         personal: view.personal,
+        selection,
+        selectedName: read?.name ?? null,
       });
     } catch (error) {
       this.log.info(`status bar refresh failed: ${(error as Error).message}`);
@@ -182,17 +205,21 @@ export class StatusBar implements vscode.Disposable {
         break;
 
       case "ready": {
-        // Name the provider only when exactly one is reporting, so the number
-        // has a subject without being ambiguous across several connections.
-        const reporting = state.providers.filter((p) => worstCaseRemaining([p]) !== null);
-        const soleName = reporting.length === 1 ? reporting[0].provider : null;
+        // The name next to the number. Under a named provider, that
+        // provider, as the server spelt it. Under `worst`, the provider
+        // whose number is being shown — the single reporting one — so a
+        // number without a subject does not read as the server's total.
+        const label =
+          state.selection === "worst"
+            ? soleReportingName(state.providers)
+            : state.selectedName;
 
         this.item.text = statusBarText({
           percentRemaining: state.percentRemaining,
-          soleProviderName: soleName,
+          soleProviderName: label,
           reachable: true,
         });
-        this.item.tooltip = buildTooltip(state.providers, state.personal, state.percentRemaining);
+        this.item.tooltip = buildTooltip(state);
 
         this.item.backgroundColor =
           state.severity === "ok"
@@ -215,18 +242,36 @@ export class StatusBar implements vscode.Disposable {
   }
 }
 
+/** The name shown next to a number computed across every provider. */
+function soleReportingName(providers: UsageSnapshot[]): string | null {
+  const reporting = providers.filter((p) => worstCaseRemaining([p]) !== null);
+  return reporting.length === 1 ? reporting[0].provider : null;
+}
+
 /**
- * Markdown tooltip: worst remaining across all connections, then each
- * connection's windows and reset, then the key's own spend.
+ * Markdown tooltip: the bar's subject first, then each connection's windows
+ * and reset, then the key's own spend.
+ *
+ * The subject line says what the number the bar shows came from, because
+ * that is the first question a reader asks when the number changed while
+ * the provider list did not.
  */
-function buildTooltip(
-  providers: UsageSnapshot[],
-  personal: UsageLimitStatus | null,
-  worst: number | null,
-): vscode.MarkdownString {
+function buildTooltip(state: Extract<StatusState, { kind: "ready" }>): vscode.MarkdownString {
+  const { providers, personal, percentRemaining: chosen, selection, selectedName } = state;
+
   const md = new vscode.MarkdownString();
   md.supportThemeIcons = true;
-  md.appendMarkdown(`**OmniRoute quota**${worst === null ? "" : ` - ${worst}% remaining**`}\n\n`);
+
+  const subject =
+    selection === "worst"
+      ? "worst across every connection"
+      : selectedName || `${selection} (not reporting)`;
+  md.appendMarkdown(
+    `**OmniRoute quota**${chosen === null ? "" : ` - ${chosen}% remaining - ${subject}`}\n\n`,
+  );
+  if (selectedName === null && selection !== "worst") {
+    md.appendMarkdown(`_No connection is named \`${selection}\`, so the bar shows no number._\n\n`);
+  }
 
   if (providers.length === 0) {
     md.appendMarkdown("_No provider connections reporting._\n");

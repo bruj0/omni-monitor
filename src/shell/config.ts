@@ -38,8 +38,16 @@ export function statusBarEnabled(): boolean {
   return cfg().get<boolean>("statusBar", true);
 }
 
-export function statusBarMode(): "worst" | "sum" {
-  return cfg().get<"worst" | "sum">("statusBarMode", "worst");
+/**
+ * Which provider the status bar reads, or `worst` for the worst case.
+ *
+ * A provider name is accepted lowercased, uppercased, or trimmed: the
+ * reader types it, and the server varies its capitalisation.
+ */
+export function statusBarProvider(): string {
+  const raw = cfg().get<string>("statusBarProvider", "worst");
+  const trimmed = raw.trim();
+  return trimmed === "" ? "worst" : trimmed.toLowerCase();
 }
 
 export function alertsEnabled(): boolean {

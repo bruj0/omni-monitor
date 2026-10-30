@@ -20,9 +20,13 @@
 
 import * as vscode from "vscode";
 import { SECRET_ADMIN_KEY, SECRET_API_KEY } from "./config";
+import type { UsageSnapshot } from "../core/usage";
 
 /** The configuration section, and the prefix every setting key shares. */
 const SECTION = "omniMonitor";
+
+/** The setting the bar's provider choice is stored under. */
+const STATUS_BAR_PROVIDER_KEY = "statusBarProvider";
 
 /** The kind of control a setting gets, derived from the manifest's type. */
 export type SettingControl = "boolean" | "number" | "string" | "enum";
@@ -139,16 +143,44 @@ function controlOf(type: string | undefined, enumValues?: string[]): SettingCont
 }
 
 /**
+ * Options the payload needs that the manifest cannot supply.
+ *
+ * The provider names come from the server, so they are not in the schema's
+ * `enum` — a dropdown built from the manifest alone would freeze whatever
+ * strings were listed there.
+ */
+export interface ConfigPayloadOptions {
+  /** The provider snapshots the status bar last saw. */
+  providers?: UsageSnapshot[];
+}
+
+/**
  * The settings, their schema, and their effective values.
  *
  * The descriptions come from the extension's own manifest, read at runtime.
  * The configuration API does not expose them, and a table of bare keys
  * without an explanation is not much of a settings screen.
+ *
+ * One setting is *quoted* rather than uncommented: `statusBarProvider` has no
+ * schema `enum`, because its options are the names the server reports. The
+ * dropdown is assembled here, and with nothing reported yet it degrades to a
+ * text box — a dropdown with one option is a door that does not open.
  */
-export function readSettings(context: vscode.ExtensionContext): ConfigSetting[] {
+export function readSettings(
+  context: vscode.ExtensionContext,
+  options: ConfigPayloadOptions = {},
+): ConfigSetting[] {
   const configuration = vscode.workspace.getConfiguration(SECTION);
   const manifest = context.extension?.packageJSON as ManifestConfig | undefined;
   const described = manifest?.contributes?.configuration?.properties ?? {};
+
+  const providerNames = Array.from(
+    new Set(
+      (options.providers ?? [])
+        .map((p) => p.provider)
+        .filter((n) => typeof n === "string" && n.trim() !== ""),
+    ),
+  );
 
   const settings: ConfigSetting[] = [];
 
@@ -163,12 +195,33 @@ export function readSettings(context: vscode.ExtensionContext): ConfigSetting[] 
       info.globalValue ??
       info.defaultValue;
 
+    let control = controlOf(schema.type, schema.enum);
+    let enumValues = schema.enum;
+
+    if (short === STATUS_BAR_PROVIDER_KEY) {
+      if (providerNames.length > 0) {
+        // Names reported: the choice is a list of providers, and nothing
+        // else. `worst` is deliberately not an option — it is the stored
+        // default that means "no provider chosen", and a reader cannot pick
+        // it from here. A synthetic current-value row renders the state;
+        // see the webview's enum renderer.
+        control = "enum";
+        enumValues = providerNames;
+      } else {
+        // Nothing reported yet (first install, server down, key not set):
+        // leave the box typable, because a known name may still be worth
+        // setting before the first snapshot arrives.
+        control = "string";
+        enumValues = undefined;
+      }
+    }
+
     settings.push({
       key: short,
-      control: controlOf(schema.type, schema.enum),
+      control,
       value: effective,
       defaultValue: schema.default,
-      enumValues: schema.enum,
+      enumValues,
       minimum: schema.minimum,
       maximum: schema.maximum,
       description: schema.markdownDescription ?? schema.description ?? "",
@@ -209,11 +262,12 @@ export async function readCredentials(
 /** The whole payload, in one call. */
 export async function readConfigPayload(
   context: vscode.ExtensionContext,
+  options: ConfigPayloadOptions = {},
 ): Promise<ConfigPayload> {
   const credentials = await readCredentials(context);
   const hasWorkspace = Boolean(vscode.workspace.workspaceFolders?.length);
   return {
-    settings: readSettings(context),
+    settings: readSettings(context, options),
     apiKey: credentials.apiKey,
     adminKey: credentials.adminKey,
     // A workspace-scoped edit is the more useful default when a workspace is
@@ -256,6 +310,14 @@ export async function updateSetting(
 
   if (!schema) {
     return { ok: false, key, message: `Unknown setting: ${key}` };
+  }
+
+  // An empty string is rejected rather than normalised to `worst`: the
+  // config reader treats blank as `worst` (shell/config.ts), but storing
+  // blank would make the stored value disagree with the manifest default and
+  // leave the `modified` badge lying about a setting that was never chosen.
+  if (key === STATUS_BAR_PROVIDER_KEY && typeof value === "string" && value.trim() === "") {
+    return { ok: false, key, message: "Choose `worst` or a provider name." };
   }
 
   const problem = validate(value, schema);

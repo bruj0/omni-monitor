@@ -67,6 +67,37 @@ test("worstCaseRemaining picks the lowest, not the average", () => {
   assert.equal(percent.worstCaseRemaining([]), null);
 });
 
+test("quotaBar fills solid blocks for what is left", () => {
+  assert.equal(format.quotaBar(100), "▬▬▬▬▬▬▬▬▬▬");
+  assert.equal(format.quotaBar(0), "▭▭▭▭▭▭▭▭▭▭");
+  // 47% of ten segments is 4.7, rounded to 5: the meter reads half-full for
+  // near-half quota rather than snapping to a tenth.
+  assert.equal(format.quotaBar(47), "▬▬▬▬▬▭▭▭▭▭");
+  assert.equal(format.quotaBar(96), "▬▬▬▬▬▬▬▬▬▬");
+  assert.equal(format.quotaBar(-5), "▭▭▭▭▭▭▭▭▭▭");
+  assert.equal(format.quotaBar(140), "▬▬▬▬▬▬▬▬▬▬");
+});
+
+test("providerRead answers one provider's own worst window, or null", () => {
+  const providers = [
+    { connectionId: "a", provider: "codex", quotas: { session: { total: 100, remaining: 40 } } },
+    {
+      connectionId: "b",
+      provider: "MiniMax",
+      quotas: {
+        weekly: { remainingPercentage: 69 },
+        session: { total: 100, used: 80 },
+      },
+    },
+  ];
+  assert.deepEqual(percent.providerRead(providers, "minimax"), { name: "MiniMax", percent: 20 });
+  // Matching is case-insensitive on purpose: the setting is typed by a reader
+  // and the server varies its capitalisation.
+  assert.deepEqual(percent.providerRead(providers, "CODEX"), { name: "codex", percent: 40 });
+  assert.equal(percent.providerRead(providers, "deepseek"), null);
+  assert.equal(percent.providerRead(providers, ""), null);
+});
+
 test("severityFor escalates on remaining, not used", () => {
   assert.equal(percent.severityFor(100), "ok");
   assert.equal(percent.severityFor(21), "ok");
@@ -106,14 +137,14 @@ test("formatTokens compacts and formatUsd handles null", () => {
   assert.match(format.formatUsd(1.5), /1\.50/);
 });
 
-test("statusBarText names the provider only when it is the only one", () => {
+test("statusBarText draws the bar with the number in it", () => {
   assert.equal(
     format.statusBarText({ percentRemaining: 23, soleProviderName: "minimax", reachable: true }),
-    "$(layers) OmniRoute 23% minimax",
+    "$(layers) ▬▬▭▭▭▭▭▭▭▭ 23% minimax",
   );
   assert.equal(
     format.statusBarText({ percentRemaining: 23, reachable: true }),
-    "$(layers) OmniRoute 23%",
+    "$(layers) ▬▬▭▭▭▭▭▭▭▭ 23%",
   );
   assert.equal(
     format.statusBarText({ percentRemaining: null, reachable: true }),
