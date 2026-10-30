@@ -408,6 +408,81 @@ body {
   font-weight: 600;
 }
 
+/* ============= config view ============= */
+
+/* The config tables use the same table styles as the rest of the panel, so
+ * they sit on the shared .quota-table rules. */
+.config-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  margin-top: 8px;
+}
+
+.config-table th {
+  text-align: left;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  color: var(--vscode-descriptionForeground);
+  font-weight: 600;
+}
+
+.config-table td {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+
+.config-table tbody tr:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+/* The setting key is an identifier, not prose: it must not wrap and it must
+ * not be truncated, or the reader cannot read what they are looking at. */
+.config-key {
+  font-family: var(--vscode-editor-font-family, monospace);
+  white-space: nowrap !important;
+  max-width: none !important;
+}
+
+/* The effective value can be long — a URL, say — so it gets the room. */
+.config-value {
+  max-width: none !important;
+}
+
+/* The credential status. Green for set, muted for not set. Both use theme
+ * colours so the panel follows the user's theme. */
+.config-set {
+  color: var(--vscode-charts-green, #4cc38a);
+  font-weight: 600;
+}
+
+.config-unset {
+  color: var(--vscode-descriptionForeground);
+}
+
+/* The notice that says where the keys are. This is the point of the view:
+ * a reader who opens a settings screen expects to see their key, and the
+ * honest answer is that they cannot. */
+.config-notice {
+  margin: 8px 0 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--vscode-panel-border);
+  border-left: 3px solid var(--vscode-charts-blue, #4e8cff);
+  border-radius: 2px;
+  background-color: var(--vscode-editorWidget-background, transparent);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: normal;
+}
+
+.config-block {
+  margin-bottom: 12px;
+}
+
 /* Four columns, so every column after the model name is a number. The shared
  * .connection-table rule skips column 2, which is a name in THAT table. */
 .provider-model-table td:not(:first-child),

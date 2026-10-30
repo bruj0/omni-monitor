@@ -34,9 +34,9 @@ const PAGE_SIZE = 20;
 
 /** The three views, and the label each button carries. */
 const VIEW_MODE_LABELS: { mode: ViewMode; label: string; hint: string }[] = [
-  { mode: "totals", label: "Totals", hint: "Aggregate usage across every provider" },
   { mode: "providers", label: "Providers", hint: "Breakdown by configured connection" },
   { mode: "logs", label: "Logs", hint: "One row per request, as the server logged it" },
+  { mode: "config", label: "Config", hint: "Settings, effective values, and where the keys live" },
 ];
 
 interface State {
@@ -58,6 +58,50 @@ interface State {
   page: number;
   /** The Logs view's own state; see `LogsState`. */
   logs: LogsState;
+  /** The Config view's own state; see `ConfigState`. */
+  config: ConfigState;
+}
+
+/**
+ * The Config view's state, fetched from the host on demand.
+ *
+ * The webview cannot read the configuration itself: `vscode.workspace` is
+ * not available inside a webview, and the two credentials live in the
+ * extension host's SecretStorage, which the webview has no access to at all.
+ * The host sends the effective values; the key values are never sent, only
+ * whether one is set.
+ */
+interface ConfigState {
+  /** The settings and their effective values, from the host. */
+  settings: ConfigSetting[];
+  /** Whether the API key is set, and where it lives. Never the key itself. */
+  apiKey: CredentialState;
+  /** Whether the admin key is set, and where it lives. */
+  adminKey: CredentialState;
+  /** True while the host has not answered yet. */
+  loading: boolean;
+}
+
+/** One setting, its effective value, and where that value came from. */
+interface ConfigSetting {
+  key: string;
+  value: string;
+  defaultValue: string;
+  /** "default", "user", "workspace", or "workspace-folder". */
+  scope: string;
+  description: string;
+}
+
+/**
+ * One credential: whether it is set, and where it is stored.
+ *
+ * Never the value. The key itself is in the OS keychain and this struct has
+ * no field to carry it.
+ */
+interface CredentialState {
+  set: boolean;
+  /** A short, non-reversible hint, so a reader can tell two keys apart. */
+  hint: string;
 }
 
 /**
@@ -93,6 +137,12 @@ let state: State = {
   selectedProvider: null,
   data: null,
   page: 0,
+  config: {
+    settings: [],
+    apiKey: { set: false, hint: "" },
+    adminKey: { set: false, hint: "" },
+    loading: false,
+  },
   logs: {
     rows: [],
     offset: 0,
@@ -114,6 +164,18 @@ const app = document.getElementById("app") as HTMLElement;
 window.addEventListener("message", (event: MessageEvent) => {
   const msg = event.data;
   if (!msg || typeof msg !== "object") return;
+
+  // The configuration answer carries its own id space too: it answers a
+  // `loadConfig` request, not the dashboard's `load`, so it must not advance
+  // the dashboard's requestId.
+  if (msg.kind === "config") {
+    state.config.settings = Array.isArray(msg.settings) ? msg.settings : [];
+    state.config.apiKey = normalizeCredential(msg.apiKey);
+    state.config.adminKey = normalizeCredential(msg.adminKey);
+    state.config.loading = false;
+    render();
+    return;
+  }
 
   // A logs page carries its own id space: it answers a `loadLogs` request, not
   // the dashboard's `load`, so it must not advance the dashboard's requestId
@@ -201,8 +263,13 @@ app.addEventListener("click", (event) => {
   } else if (command === "refresh") {
     // In the Logs view the header's Refresh reloads the current log page: the
     // dashboard payload it would otherwise request is not what is on screen.
+    // The Config view refreshes the settings, for the same reason.
     if (state.viewMode === "logs") {
       loadLogs(state.logs.offset);
+      return;
+    }
+    if (state.viewMode === "config") {
+      loadConfig();
       return;
     }
     vscode.postMessage({ command: "refresh" });
@@ -217,8 +284,9 @@ app.addEventListener("click", (event) => {
     const mode = target.getAttribute("data-value");
     if (!isViewMode(mode)) return;
     // Draw the new mode straight away. The host answers with the same data,
-    // so this is a re-render, not a refetch. The Logs view is the exception:
-    // its rows are not in the payload, so entering it fetches a page.
+    // so this is a re-render, not a refetch. The Logs and Config views are the
+    // exceptions: their contents are not in the payload, so entering them
+    // fetches from the host.
     state.viewMode = mode;
     render();
     vscode.postMessage({ command: "setViewMode", mode });
@@ -227,6 +295,9 @@ app.addEventListener("click", (event) => {
     // minutes old. The offset and filters are kept, so the reader returns to
     // the page they left.
     if (mode === "logs" && !state.logs.loading) loadLogs(state.logs.offset);
+    // Same for the Config view: the settings can have changed since the last
+    // visit, and the host is the only one that can read them.
+    if (mode === "config") loadConfig();
   } else if (command === "selectProvider") {
     // Purely local for the aggregate views: the payload already holds every
     // provider's rows, so a filter is a re-render. The Logs view is the
@@ -274,6 +345,14 @@ function render(): void {
   app.textContent = "";
   app.appendChild(renderHeader());
 
+  // The Config view replaces the body before the loading and error branches.
+  // It is about the extension, not about the server, so it does not depend on
+  // a dashboard payload and it must still be readable when the server is down.
+  if (state.viewMode === "config") {
+    app.appendChild(renderConfigView());
+    return;
+  }
+
   if (state.loading) {
     app.appendChild(renderLoading());
     return;
@@ -290,7 +369,6 @@ function render(): void {
   const analytics = state.data.analytics;
   const byModel: any[] = analytics?.byModel ?? [];
   const quota: any[] = state.data.quota ?? [];
-  const provider = state.selectedProvider;
 
   // The provider bar sits above everything and filters every section, so it is
   // rendered before any of them reads `state.selectedProvider`.
@@ -306,15 +384,9 @@ function render(): void {
 
   app.appendChild(renderCards(analytics));
 
-  // Slot 1 differs by view. Totals keeps the dashboard exactly as it was
-  // before the switch existed; Providers replaces that one section with the
-  // per-connection breakdown, which carries the same quota state plus usage.
-  // Both narrow to the selected provider when there is one.
-  if (state.viewMode === "providers") {
-    app.appendChild(renderConnections(quota, byModel));
-  } else {
-    app.appendChild(renderQuota(filterByProvider(quota, provider)));
-  }
+  // The per-connection breakdown: the same quota state plus usage, narrowed
+  // to the selected provider when there is one.
+  app.appendChild(renderConnections(quota, byModel));
 
   const container = document.createElement("div");
   container.className = "container";
@@ -328,7 +400,7 @@ function render(): void {
   content.appendChild(renderTrend(analytics));
   content.appendChild(renderRank(analytics));
 
-  const logs = filterLogsByProvider(state.data.logs ?? [], provider);
+  const logs = filterLogsByProvider(state.data.logs ?? [], state.selectedProvider);
   content.appendChild(renderLogs(logs, logs.length, state.page));
 
   container.appendChild(sidebar);
@@ -337,7 +409,7 @@ function render(): void {
 }
 
 /**
- * The quota entries for one provider, or all of them.
+ * The rows for one provider, or all of them.
  *
  * `provider` is the connection slug, which is the same key the models join
  * uses, so filtering is exact.
@@ -551,57 +623,6 @@ function card(title: string, value: string, detail: string): HTMLElement {
   el.appendChild(v);
   el.appendChild(d);
   return el;
-}
-
-/**
- * The totals view's quota table: the current state of every connection.
- *
- * Kept as it was before the view switch existed, because "Totals" is defined
- * as the dashboard as it was. The Providers view supersedes this table rather
- * than adding to it — see `renderConnections`.
- */
-function renderQuota(quota: any[]): HTMLElement {
-  const section = document.createElement("section");
-  section.className = "chart-section";
-
-  const title = document.createElement("h3");
-  title.className = "chart-section-title";
-  title.textContent = "Quota by connection";
-  section.appendChild(title);
-
-  if (quota.length === 0) {
-    section.appendChild(renderEmpty("No quota data."));
-    return section;
-  }
-
-  const table = document.createElement("table");
-  table.className = "quota-table";
-
-  table.appendChild(headRow(["Connection", "Provider", "Used", "Remaining", "Reset"]));
-
-  const body = document.createElement("tbody");
-  for (const entry of quota) {
-    const used =
-      entry.quotaTotal === null || entry.quotaTotal === undefined
-        ? "-"
-        : entry.quotaUsed + "/" + entry.quotaTotal;
-    const tr = document.createElement("tr");
-    for (const value of [
-      entry.name ?? String(entry.connectionId ?? "-").slice(0, 8),
-      entry.provider ?? "-",
-      used,
-      Math.round(entry.percentRemaining ?? 0) + "%",
-      entry.resetAt ? formatResetIn(entry.resetAt) : "-",
-    ]) {
-      const td = document.createElement("td");
-      td.textContent = String(value);
-      tr.appendChild(td);
-    }
-    body.appendChild(tr);
-  }
-  table.appendChild(body);
-  section.appendChild(table);
-  return section;
 }
 
 /**
@@ -1246,6 +1267,204 @@ function headRow(labels: string[]): HTMLElement {
   }
   head.appendChild(tr);
   return head;
+}
+
+/**
+ * The Config view: every setting, its effective value, and where the two
+ * credentials live.
+ *
+ * The webview cannot read any of this itself. `vscode.workspace` is not
+ * available in a webview, and the credentials are in the extension host's
+ * SecretStorage, which the webview has no access to at all. So the host sends
+ * the effective values and the *fact* that a key is set, never the key.
+ *
+ * The view replaces the body, like the Logs view does, because it is about
+ * the extension rather than about the server. It also renders before the
+ * loading and error branches, so it stays readable when the server is down.
+ */
+function renderConfigView(): HTMLElement {
+  const section = document.createElement("section");
+  section.className = "chart-section config-section";
+
+  const title = document.createElement("h3");
+  title.className = "chart-section-title";
+  title.textContent = "Configuration";
+  section.appendChild(title);
+
+  if (state.config.loading && state.config.settings.length === 0) {
+    section.appendChild(renderEmpty("Loading the configuration..."));
+    return section;
+  }
+
+  section.appendChild(renderConfigSettings(state.config.settings));
+  section.appendChild(renderConfigCredentials());
+  return section;
+}
+
+/** The settings table: key, effective value, and where the value came from. */
+function renderConfigSettings(settings: ConfigSetting[]): HTMLElement {
+  const wrapper = document.createElement("div");
+  wrapper.className = "config-block";
+
+  const heading = document.createElement("h4");
+  heading.className = "detail-heading";
+  heading.textContent = "Settings";
+  wrapper.appendChild(heading);
+
+  if (settings.length === 0) {
+    wrapper.appendChild(renderEmpty("No settings reported."));
+    return wrapper;
+  }
+
+  const table = document.createElement("table");
+  table.className = "quota-table config-table";
+  table.appendChild(headRow(["Setting", "Value", "Source", "Default"]));
+
+  const body = document.createElement("tbody");
+  for (const setting of settings) {
+    const tr = document.createElement("tr");
+
+    const keyCell = document.createElement("td");
+    keyCell.className = "config-key";
+    keyCell.textContent = setting.key;
+    tr.appendChild(keyCell);
+
+    const valueCell = document.createElement("td");
+    valueCell.className = "config-value";
+    valueCell.textContent = setting.value;
+    if (setting.description) valueCell.title = setting.description;
+    tr.appendChild(valueCell);
+
+    const scopeCell = document.createElement("td");
+    scopeCell.textContent = setting.scope;
+    tr.appendChild(scopeCell);
+
+    const defaultCell = document.createElement("td");
+    defaultCell.textContent = setting.defaultValue;
+    tr.appendChild(defaultCell);
+
+    body.appendChild(tr);
+  }
+  table.appendChild(body);
+  wrapper.appendChild(table);
+
+  const note = document.createElement("div");
+  note.className = "section-note";
+  note.textContent =
+    "Source says where the value comes from: the extension default, your user " +
+    "settings, or this workspace's settings. Change a value in Settings, under " +
+    "Omni Monitor.";
+  wrapper.appendChild(note);
+
+  return wrapper;
+}
+
+/**
+ * The credentials block, and the notice that says where the keys are.
+ *
+ * The notice is the point of this block. A reader who opens a settings screen
+ * expects to see their key, and the honest answer is that they cannot: the
+ * key is in the OS keychain, and the extension never puts it anywhere the
+ * user can read it back. Saying that plainly is better than showing an empty
+ * field that looks like a mistake.
+ */
+function renderConfigCredentials(): HTMLElement {
+  const wrapper = document.createElement("div");
+  wrapper.className = "config-block";
+
+  const heading = document.createElement("h4");
+  heading.className = "detail-heading";
+  heading.textContent = "Credentials";
+  wrapper.appendChild(heading);
+
+  const notice = document.createElement("div");
+  notice.className = "config-notice";
+  notice.setAttribute("role", "note");
+  notice.textContent =
+    "Your API key and admin key are never saved in clear text. They are stored " +
+    "in the operating system's secret store (the OS keychain), not in " +
+    "settings.json and not on disk in this extension's folder. The extension " +
+    "reads them from there at request time, and it never sends them anywhere " +
+    "except to your own server. You cannot read them back from here, by " +
+    "design.";
+  wrapper.appendChild(notice);
+
+  const table = document.createElement("table");
+  table.className = "quota-table config-table";
+  table.appendChild(headRow(["Credential", "Status", "Stored in", "Scope needed"]));
+
+  const body = document.createElement("tbody");
+  for (const credential of [
+    {
+      name: "API key",
+      state: state.config.apiKey,
+      scope: "ordinary key with allowUsageCommand",
+    },
+    {
+      name: "Admin key",
+      state: state.config.adminKey,
+      scope: "manage or admin (optional)",
+    },
+  ]) {
+    const tr = document.createElement("tr");
+
+    const nameCell = document.createElement("td");
+    nameCell.textContent = credential.name;
+    tr.appendChild(nameCell);
+
+    const statusCell = document.createElement("td");
+    statusCell.className = credential.state.set ? "config-set" : "config-unset";
+    statusCell.textContent = credential.state.set ? "set" : "not set";
+    tr.appendChild(statusCell);
+
+    const storeCell = document.createElement("td");
+    storeCell.textContent = "OS keychain";
+    tr.appendChild(storeCell);
+
+    const scopeCell = document.createElement("td");
+    scopeCell.textContent = credential.scope;
+    tr.appendChild(scopeCell);
+
+    body.appendChild(tr);
+  }
+  table.appendChild(body);
+  wrapper.appendChild(table);
+
+  const note = document.createElement("div");
+  note.className = "section-note";
+  note.textContent =
+    "Set or clear a key with the commands Omni Monitor: Set API Key, " +
+    "Omni Monitor: Set Admin Key, and Omni Monitor: Clear Stored Keys.";
+  wrapper.appendChild(note);
+
+  return wrapper;
+}
+
+/**
+ * Ask the host for the configuration.
+ *
+ * The host is the only one that can read the settings and the SecretStorage,
+ * so this is a request rather than a local read.
+ */
+function loadConfig(): void {
+  state.config.loading = true;
+  render();
+  vscode.postMessage({ command: "loadConfig" });
+}
+
+/**
+ * Normalize a credential answer.
+ *
+ * The host sends `{ set, hint }`. Anything else is treated as "not set",
+ * because a malformed answer must not be read as a key being present.
+ */
+function normalizeCredential(value: unknown): CredentialState {
+  if (!value || typeof value !== "object") return { set: false, hint: "" };
+  const raw = value as { set?: unknown; hint?: unknown };
+  return {
+    set: raw.set === true,
+    hint: typeof raw.hint === "string" ? raw.hint : "",
+  };
 }
 
 function renderLoading(): HTMLElement {

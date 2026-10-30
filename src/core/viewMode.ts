@@ -8,20 +8,23 @@
 /**
  * Which view the dashboard shows.
  *
- * - `totals` — the summary cards, the trend chart, the model donut and the
- *   records table. The aggregate view of everything that happened.
- * - `providers` — the same aggregate view plus a breakdown of the
- *   connections configured in OmniRoute, each with its quota state.
+ * - `providers` — the summary cards, the trend chart, the model donut, the
+ *   records table, and a breakdown of the connections configured in
+ *   OmniRoute, each with its quota state.
  * - `logs` — the request log, one row per request, mirroring the server's own
  *   `<server>/dashboard/logs` table. It replaces the body rather than adding
  *   a section, because a log is read row by row and none of the aggregate
  *   sections answer a question about one request.
+ * - `config` — the configuration: every setting, its effective value, and
+ *   where the two credentials live. It replaces the body like the Logs view
+ *   does, because it is about the extension rather than about the server.
  *
- * Totals and Providers differ only in the provider section. Everything else
- * is shared, because a mode that changed everything would be two dashboards
- * rather than two views of one.
+ * There was a third view, `totals`, which was the aggregate view without the
+ * per-connection breakdown. It was removed on 2026-10-30: the Providers view
+ * already carried everything it had, plus the connection table, so the two
+ * differed by one section and the smaller one earned nothing.
  */
-export const VIEW_MODES = ["totals", "providers", "logs"] as const;
+export const VIEW_MODES = ["providers", "logs", "config"] as const;
 export type ViewMode = (typeof VIEW_MODES)[number];
 
 export function isViewMode(value: unknown): value is ViewMode {
@@ -29,4 +32,4 @@ export function isViewMode(value: unknown): value is ViewMode {
 }
 
 /** The mode the dashboard opens in when nothing is stored. */
-export const DEFAULT_VIEW_MODE: ViewMode = "totals";
+export const DEFAULT_VIEW_MODE: ViewMode = "providers";

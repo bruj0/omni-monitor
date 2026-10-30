@@ -25,6 +25,8 @@ import {
   ManagementAuthError,
 } from "./adminClient";
 import { adminKey } from "./config";
+import { readConfigPayload } from "./configPayload";
+import type { ConfigSetting, CredentialState } from "./configPayload";
 import type { AnalyticsEnvelope, Range, RequestLogRow } from "../core/analytics";
 import { isRange } from "../core/analytics";
 import { hourlyBuckets, type HourlyBucket } from "../core/hourly";
@@ -66,6 +68,21 @@ export interface HostError {
   requestId: number;
   kind: HostErrorKind;
   message: string;
+}
+
+/**
+ * The answer to a `loadConfig` message: the settings and the credential
+ * states.
+ *
+ * A separate message shape, like the logs page, because the Config view
+ * answers on its own schedule and does not depend on a dashboard payload. The
+ * credential values are not part of it: only whether a key is set.
+ */
+export interface ConfigMessage {
+  kind: "config";
+  settings: ConfigSetting[];
+  apiKey: CredentialState;
+  adminKey: CredentialState;
 }
 
 /**
@@ -176,9 +193,24 @@ export class DashboardPanel implements vscode.WebviewViewProvider {
           case "loadLogs":
             void this.loadLogs(msg);
             return;
+          case "loadConfig":
+            void this.loadConfig();
+            return;
         }
       },
     );
+  }
+
+  /**
+   * Answer the Config view with the settings and the credential states.
+   *
+   * The webview cannot read either of these itself, so the host sends them.
+   * The credential values are not part of the answer: only whether a key is
+   * set, and a short hint that tells two keys apart.
+   */
+  private async loadConfig(): Promise<void> {
+    const payload = await readConfigPayload(this.context);
+    this.post({ kind: "config", ...payload });
   }
 
   /** Visible again after being collapsed; refresh so the data is not stale. */
@@ -324,7 +356,7 @@ export class DashboardPanel implements vscode.WebviewViewProvider {
     }
   }
 
-  private post(message: DashboardPayload | HostError): void {
+  private post(message: DashboardPayload | HostError | ConfigMessage): void {
     void this.view?.webview.postMessage(message);
   }
 

@@ -6,19 +6,26 @@ const viewMode = require("../dist/core/viewMode.js");
 const connections = require("../dist/core/connections.js");
 
 test("isViewMode accepts the three modes and nothing else", () => {
-  assert.equal(viewMode.isViewMode("totals"), true);
   assert.equal(viewMode.isViewMode("providers"), true);
   assert.equal(viewMode.isViewMode("logs"), true);
-  assert.deepEqual([...viewMode.VIEW_MODES], ["totals", "providers", "logs"]);
+  assert.equal(viewMode.isViewMode("config"), true);
+  assert.deepEqual([...viewMode.VIEW_MODES], ["providers", "logs", "config"]);
 
-  for (const value of ["Totals", "provider", "log", "", null, undefined, 0, {}, []]) {
+  for (const value of ["Providers", "provider", "log", "", null, undefined, 0, {}, []]) {
     assert.equal(viewMode.isViewMode(value), false, `${JSON.stringify(value)} is not a mode`);
   }
 });
 
+test("the removed totals mode is not a mode", () => {
+  // The Totals view was removed on 2026-10-30. A stored view mode from
+  // before that must not be accepted, or a stale preference would put the
+  // dashboard in a view it no longer has.
+  assert.equal(viewMode.isViewMode("totals"), false);
+});
+
 test("DEFAULT_VIEW_MODE is a real mode", () => {
   assert.equal(viewMode.isViewMode(viewMode.DEFAULT_VIEW_MODE), true);
-  assert.equal(viewMode.DEFAULT_VIEW_MODE, "totals");
+  assert.equal(viewMode.DEFAULT_VIEW_MODE, "providers");
 });
 
 // The join these tests pin was measured against the live server on 2026-10-30.

@@ -43,7 +43,8 @@
     "build": "tsc -p ./ && node scripts/copy-webview.js",
     "test": "node --test test/",
     "typecheck": "tsc -p ./ --noEmit",
-    "vscode:prepublish": "npm run build"
+    "vscode:prepublish": "npm run build",
+    "reload": "node scripts/reload.mjs"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
