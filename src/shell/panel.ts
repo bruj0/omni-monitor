@@ -25,7 +25,13 @@ import {
   ManagementAuthError,
 } from "./adminClient";
 import { adminKey } from "./config";
-import { readConfigPayload } from "./configPayload";
+import {
+  clearCredential,
+  readConfigPayload,
+  resetSetting,
+  setCredential,
+  updateSetting,
+} from "./configPayload";
 import type { ConfigSetting, CredentialState } from "./configPayload";
 import type { AnalyticsEnvelope, Range, RequestLogRow } from "../core/analytics";
 import { isRange } from "../core/analytics";
@@ -83,6 +89,21 @@ export interface ConfigMessage {
   settings: ConfigSetting[];
   apiKey: CredentialState;
   adminKey: CredentialState;
+  defaultTarget: "user" | "workspace";
+  hasWorkspace: boolean;
+}
+
+/**
+ * The answer to an edit: whether it worked, and why not if it did not.
+ *
+ * Sent before the refreshed payload, so the form can show the message next
+ * to the control that failed.
+ */
+export interface ConfigResultMessage {
+  kind: "configResult";
+  ok: boolean;
+  key: string;
+  message?: string;
 }
 
 /**
@@ -158,6 +179,10 @@ export class DashboardPanel implements vscode.WebviewViewProvider {
         status?: string;
         search?: string;
         provider?: string | null;
+        key?: string;
+        value?: unknown;
+        target?: string;
+        which?: string;
       }) => {
         switch (msg?.command) {
           case "ready":
@@ -196,6 +221,28 @@ export class DashboardPanel implements vscode.WebviewViewProvider {
           case "loadConfig":
             void this.loadConfig();
             return;
+          case "updateSetting":
+            void this.applySetting(msg);
+            return;
+          case "resetSetting":
+            void this.resetSetting(msg);
+            return;
+          case "setCredential":
+            void this.applyCredential(msg);
+            return;
+          case "clearCredential":
+            void this.removeCredential(msg);
+            return;
+          case "openSettings":
+            // Open VS Code's own Settings editor, filtered to this
+            // extension. It is the authoritative editor: it knows about
+            // scopes, language overrides and every keybinding-style detail
+            // this form does not.
+            void vscode.commands.executeCommand(
+              "workbench.action.openSettings",
+              "@ext:omniMonitor.omni-monitor",
+            );
+            return;
         }
       },
     );
@@ -211,6 +258,60 @@ export class DashboardPanel implements vscode.WebviewViewProvider {
   private async loadConfig(): Promise<void> {
     const payload = await readConfigPayload(this.context);
     this.post({ kind: "config", ...payload });
+  }
+
+  /** The scope an edit asks for, defaulting to the user's settings. */
+  private editTarget(msg: { target?: string }): "user" | "workspace" {
+    return msg.target === "workspace" ? "workspace" : "user";
+  }
+
+  /**
+   * Apply one setting edit and answer with the result.
+   *
+   * The answer is sent back before the payload is re-sent, so the form can
+   * show the failure next to the control that failed. On success the
+   * payload follows, so the form shows the new value and its new scope.
+   */
+  private async applySetting(msg: { key?: string; value?: unknown; target?: string }): Promise<void> {
+    if (typeof msg.key !== "string") return;
+    const result = await updateSetting(
+      this.context,
+      msg.key,
+      msg.value,
+      this.editTarget(msg),
+    );
+    this.post({ kind: "configResult", ...result });
+    if (result.ok) await this.loadConfig();
+  }
+
+  /** Reset one setting to its default. */
+  private async resetSetting(msg: { key?: string; target?: string }): Promise<void> {
+    if (typeof msg.key !== "string") return;
+    const result = await resetSetting(this.context, msg.key, this.editTarget(msg));
+    this.post({ kind: "configResult", ...result });
+    if (result.ok) await this.loadConfig();
+  }
+
+  /**
+   * Store a credential the form collected.
+   *
+   * The value is never echoed back: the payload that follows says only
+   * whether a key is set.
+   */
+  private async applyCredential(msg: { which?: string; value?: unknown }): Promise<void> {
+    if (msg.which !== "apiKey" && msg.which !== "adminKey") return;
+    if (typeof msg.value !== "string") return;
+    const result = await setCredential(this.context, msg.which, msg.value);
+    this.post({ kind: "configResult", ...result });
+    if (result.ok) await this.loadConfig();
+  }
+
+  /** Remove a credential. */
+  private async removeCredential(msg: { which?: string }): Promise<void> {
+    if (msg.which !== "apiKey" && msg.which !== "adminKey") return;
+    const result = await clearCredential(this.context, msg.which);
+    this.post({ kind: "configResult", ...result });
+    if (result.ok) await this.loadConfig();
   }
 
   /** Visible again after being collapsed; refresh so the data is not stale. */
@@ -356,7 +457,9 @@ export class DashboardPanel implements vscode.WebviewViewProvider {
     }
   }
 
-  private post(message: DashboardPayload | HostError | ConfigMessage): void {
+  private post(
+    message: DashboardPayload | HostError | ConfigMessage | ConfigResultMessage,
+  ): void {
     void this.view?.webview.postMessage(message);
   }
 

@@ -68,28 +68,44 @@ interface State {
  * The webview cannot read the configuration itself: `vscode.workspace` is
  * not available inside a webview, and the two credentials live in the
  * extension host's SecretStorage, which the webview has no access to at all.
- * The host sends the effective values; the key values are never sent, only
- * whether one is set.
+ * The host sends the effective values and the schema; the key values are
+ * never sent, only whether one is set.
  */
 interface ConfigState {
-  /** The settings and their effective values, from the host. */
+  /** The settings, their schema, and their effective values. */
   settings: ConfigSetting[];
   /** Whether the API key is set, and where it lives. Never the key itself. */
   apiKey: CredentialState;
   /** Whether the admin key is set, and where it lives. */
   adminKey: CredentialState;
+  /** Where edits go: "user" or "workspace". */
+  target: "user" | "workspace";
+  /** True when a workspace is open, so the workspace scope is selectable. */
+  hasWorkspace: boolean;
   /** True while the host has not answered yet. */
   loading: boolean;
+  /** The message from the last failed edit, keyed by setting or credential. */
+  errors: Record<string, string>;
 }
 
-/** One setting, its effective value, and where that value came from. */
+/**
+ * One setting: its schema, its effective value, and where it came from.
+ *
+ * The schema comes from the extension's manifest, so the form's controls
+ * and its validation come from the same source the Settings editor uses.
+ */
 interface ConfigSetting {
   key: string;
-  value: string;
-  defaultValue: string;
+  control: "boolean" | "number" | "string" | "enum";
+  value: unknown;
+  defaultValue: unknown;
+  enumValues?: string[];
+  minimum?: number;
+  maximum?: number;
+  description: string;
   /** "default", "user", "workspace", or "workspace-folder". */
   scope: string;
-  description: string;
+  modified: boolean;
 }
 
 /**
@@ -102,6 +118,8 @@ interface CredentialState {
   set: boolean;
   /** A short, non-reversible hint, so a reader can tell two keys apart. */
   hint: string;
+  /** The scope the key needs. */
+  scopeNeeded: string;
 }
 
 /**
@@ -139,9 +157,12 @@ let state: State = {
   page: 0,
   config: {
     settings: [],
-    apiKey: { set: false, hint: "" },
-    adminKey: { set: false, hint: "" },
+    apiKey: { set: false, hint: "", scopeNeeded: "" },
+    adminKey: { set: false, hint: "", scopeNeeded: "" },
+    target: "user",
+    hasWorkspace: false,
     loading: false,
+    errors: {},
   },
   logs: {
     rows: [],
@@ -172,7 +193,22 @@ window.addEventListener("message", (event: MessageEvent) => {
     state.config.settings = Array.isArray(msg.settings) ? msg.settings : [];
     state.config.apiKey = normalizeCredential(msg.apiKey);
     state.config.adminKey = normalizeCredential(msg.adminKey);
+    state.config.target = msg.defaultTarget === "workspace" ? "workspace" : "user";
+    state.config.hasWorkspace = msg.hasWorkspace === true;
     state.config.loading = false;
+    render();
+    return;
+  }
+
+  // The answer to an edit: a failure is shown next to the control that
+  // failed, and a success clears the old message.
+  if (msg.kind === "configResult") {
+    const key = typeof msg.key === "string" ? msg.key : "";
+    if (msg.ok === true) {
+      delete state.config.errors[key];
+    } else {
+      state.config.errors[key] = typeof msg.message === "string" ? msg.message : "The change was not saved.";
+    }
     render();
     return;
   }
@@ -234,6 +270,14 @@ window.addEventListener("message", (event: MessageEvent) => {
     // a restored Logs view sits empty until the reader presses Refresh.
     if (state.viewMode === "logs" && state.logs.appliedRequestId === 0 && !state.logs.loading) {
       loadLogs(0);
+    }
+
+    // Same for the Config view: its settings are not in the dashboard
+    // payload, so a restored Config view has to ask for them. Without this
+    // the view renders "No settings reported." on a restored session and on
+    // every reload, because no click ever happened to trigger the fetch.
+    if (state.viewMode === "config" && state.config.settings.length === 0 && !state.config.loading) {
+      loadConfig();
     }
   }
 });
@@ -309,6 +353,40 @@ app.addEventListener("click", (event) => {
   } else if (command === "logsStatus") {
     state.logs.status = target.getAttribute("data-value") ?? "";
     loadLogs(0);
+  } else if (command === "setConfigTarget") {
+    // Where edits go. The scope is a property of the whole form, not of one
+    // setting, so it is held in the state and sent with every edit.
+    const scope = target.getAttribute("data-value");
+    if (scope === "user" || scope === "workspace") {
+      state.config.target = scope;
+      render();
+    }
+  } else if (command === "saveSetting") {
+    const key = target.getAttribute("data-value") ?? "";
+    const control = document.querySelector(`[data-setting="${key}"]`);
+    if (control) {
+      vscode.postMessage({
+        command: "updateSetting",
+        key,
+        value: readControlValue(control),
+        target: state.config.target,
+      });
+    }
+  } else if (command === "saveCredential") {
+    const which = target.getAttribute("data-value") ?? "";
+    const input = document.querySelector(`[data-credential-input="${which}"]`);
+    if (input instanceof HTMLInputElement) {
+      vscode.postMessage({
+        command: "setCredential",
+        which,
+        value: input.value,
+      });
+    }
+  } else if (command === "clearCredential") {
+    const which = target.getAttribute("data-value") ?? "";
+    vscode.postMessage({ command: "clearCredential", which });
+  } else if (command === "openSettings") {
+    vscode.postMessage({ command: "openSettings" });
   } else if (command === "logsRow") {
     const id = target.getAttribute("data-value") ?? "";
     state.logs.expanded = state.logs.expanded === id ? null : id;
@@ -1270,6 +1348,30 @@ function headRow(labels: string[]): HTMLElement {
 }
 
 /**
+ * Read the value out of a control.
+ *
+ * A number box reports text, not a number, so an empty box and a box
+ * holding "abc" both have to become something the host can reject. An
+ * empty box becomes `undefined`, which the host treats as "not a number"
+ * and answers with a message; the reader sees why instead of the value
+ * silently becoming `NaN`.
+ */
+function readControlValue(control: Element): unknown {
+  if (control instanceof HTMLInputElement) {
+    if (control.type === "checkbox") return control.checked;
+    if (control.type === "number") {
+      const raw = control.value.trim();
+      if (raw === "") return undefined;
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) ? parsed : raw;
+    }
+    return control.value;
+  }
+  if (control instanceof HTMLSelectElement) return control.value;
+  return undefined;
+}
+
+/**
  * The Config view: every setting, its effective value, and where the two
  * credentials live.
  *
@@ -1296,12 +1398,70 @@ function renderConfigView(): HTMLElement {
     return section;
   }
 
+  section.appendChild(renderConfigScopePicker());
   section.appendChild(renderConfigSettings(state.config.settings));
   section.appendChild(renderConfigCredentials());
+  section.appendChild(renderConfigFooter());
   return section;
 }
 
-/** The settings table: key, effective value, and where the value came from. */
+/**
+ * Where an edit goes: the user's settings, or this workspace's.
+ *
+ * The same choice the Settings editor offers, because it is the same
+ * decision. "Workspace" is only offered when a workspace is open: a
+ * workspace-scoped setting cannot be saved without one, and offering a
+ * choice that fails is worse than not offering it.
+ */
+function renderConfigScopePicker(): HTMLElement {
+  const bar = document.createElement("div");
+  bar.className = "config-scope";
+
+  const label = document.createElement("span");
+  label.className = "config-scope-label";
+  label.textContent = "Save changes to";
+  bar.appendChild(label);
+
+  const group = document.createElement("div");
+  // NOT .provider-selector: the CDP check asserts that the provider group's
+  // label is "Provider", and a second group with that class made the claim
+  // fail in the Config view. One class, one group.
+  group.className = "config-scope-group";
+  group.setAttribute("role", "group");
+  group.setAttribute("aria-label", "Configuration scope");
+
+  const scopes: { id: "user" | "workspace"; label: string }[] = [
+    { id: "user", label: "User" },
+  ];
+  if (state.config.hasWorkspace) {
+    scopes.push({ id: "workspace", label: "Workspace" });
+  }
+
+  for (const scope of scopes) {
+    const button = document.createElement("button");
+    button.className = "provider-chip" + (state.config.target === scope.id ? " active" : "");
+    button.setAttribute("data-command", "setConfigTarget");
+    button.setAttribute("data-value", scope.id);
+    button.setAttribute("aria-pressed", state.config.target === scope.id ? "true" : "false");
+    button.textContent = scope.label;
+    group.appendChild(button);
+  }
+
+  bar.appendChild(group);
+  return bar;
+}
+
+/**
+ * The settings form.
+ *
+ * One row per setting, with the control the manifest's schema asks for:
+ * a checkbox for a boolean, a number box with the manifest's bounds, a
+ * dropdown for an enum, a text box otherwise.
+ *
+ * The schema is the same source the Settings editor renders from, so a
+ * setting added to `package.json` appears here with no code change, and
+ * the enum and bounds are the form's own validation.
+ */
 function renderConfigSettings(settings: ConfigSetting[]): HTMLElement {
   const wrapper = document.createElement("div");
   wrapper.className = "config-block";
@@ -1316,57 +1476,169 @@ function renderConfigSettings(settings: ConfigSetting[]): HTMLElement {
     return wrapper;
   }
 
-  const table = document.createElement("table");
-  table.className = "quota-table config-table";
-  table.appendChild(headRow(["Setting", "Value", "Source", "Default"]));
+  const form = document.createElement("div");
+  form.className = "config-form";
 
-  const body = document.createElement("tbody");
   for (const setting of settings) {
-    const tr = document.createElement("tr");
-
-    const keyCell = document.createElement("td");
-    keyCell.className = "config-key";
-    keyCell.textContent = setting.key;
-    tr.appendChild(keyCell);
-
-    const valueCell = document.createElement("td");
-    valueCell.className = "config-value";
-    valueCell.textContent = setting.value;
-    if (setting.description) valueCell.title = setting.description;
-    tr.appendChild(valueCell);
-
-    const scopeCell = document.createElement("td");
-    scopeCell.textContent = setting.scope;
-    tr.appendChild(scopeCell);
-
-    const defaultCell = document.createElement("td");
-    defaultCell.textContent = setting.defaultValue;
-    tr.appendChild(defaultCell);
-
-    body.appendChild(tr);
+    form.appendChild(renderConfigField(setting));
   }
-  table.appendChild(body);
-  wrapper.appendChild(table);
 
-  const note = document.createElement("div");
-  note.className = "section-note";
-  note.textContent =
-    "Source says where the value comes from: the extension default, your user " +
-    "settings, or this workspace's settings. Change a value in Settings, under " +
-    "Omni Monitor.";
-  wrapper.appendChild(note);
-
+  wrapper.appendChild(form);
   return wrapper;
 }
 
+/** One setting: its label, its control, and its description. */
+function renderConfigField(setting: ConfigSetting): HTMLElement {
+  const field = document.createElement("div");
+  field.className = "config-field";
+  // The FIELD carries `data-setting-field` and the CONTROL carries
+  // `data-setting`. They were the same attribute, and a lookup for the
+  // control matched the wrapper instead: the value came back undefined and
+  // the host rejected it as "not a number". One attribute, one element.
+  field.setAttribute("data-setting-field", setting.key);
+
+  const label = document.createElement("label");
+  label.className = "config-label";
+  label.setAttribute("for", `config-${setting.key}`);
+  label.textContent = setting.key;
+  if (setting.modified) {
+    const badge = document.createElement("span");
+    badge.className = "config-modified";
+    badge.textContent = "modified";
+    badge.title = `Changed from the default (${String(setting.defaultValue)})`;
+    label.appendChild(badge);
+  }
+  field.appendChild(label);
+
+  const control = renderConfigControl(setting);
+  field.appendChild(control);
+
+  const meta = document.createElement("div");
+  meta.className = "config-meta";
+
+  if (setting.description) {
+    const description = document.createElement("span");
+    description.className = "config-description";
+    description.textContent = setting.description;
+    meta.appendChild(description);
+  }
+
+  const scope = document.createElement("span");
+  scope.className = "config-scope-of";
+  scope.textContent = `source: ${setting.scope}`;
+  meta.appendChild(scope);
+
+  field.appendChild(meta);
+
+  const error = state.config.errors[setting.key];
+  if (error) {
+    const message = document.createElement("div");
+    message.className = "config-error";
+    message.setAttribute("role", "alert");
+    message.textContent = error;
+    field.appendChild(message);
+  }
+
+  return field;
+}
+
 /**
- * The credentials block, and the notice that says where the keys are.
+ * The control for one setting.
  *
- * The notice is the point of this block. A reader who opens a settings screen
- * expects to see their key, and the honest answer is that they cannot: the
- * key is in the OS keychain, and the extension never puts it anywhere the
- * user can read it back. Saying that plainly is better than showing an empty
- * field that looks like a mistake.
+ * A boolean is a checkbox that applies on change. The others are inputs
+ * with a Save button, because a text box that writes on every keystroke
+ * would fight the reader: the value goes into the settings file as they
+ * type, and there is no way to back out of a half-typed value.
+ */
+function renderConfigControl(setting: ConfigSetting): HTMLElement {
+  const id = `config-${setting.key}`;
+
+  if (setting.control === "boolean") {
+    const row = document.createElement("div");
+    row.className = "config-control-row";
+
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.id = id;
+    input.checked = setting.value === true;
+    input.setAttribute("data-setting", setting.key);
+    input.setAttribute("data-control", "boolean");
+    input.addEventListener("change", () => {
+      vscode.postMessage({
+        command: "updateSetting",
+        key: setting.key,
+        value: input.checked,
+        target: state.config.target,
+      });
+    });
+
+    row.appendChild(input);
+    row.appendChild(configSaveButton(setting.key, "Apply"));
+    return row;
+  }
+
+  const row = document.createElement("div");
+  row.className = "config-control-row";
+
+  let input: HTMLInputElement | HTMLSelectElement;
+
+  if (setting.control === "enum" && setting.enumValues) {
+    const select = document.createElement("select");
+    select.id = id;
+    select.setAttribute("data-setting", setting.key);
+    select.setAttribute("data-control", "enum");
+    for (const option of setting.enumValues) {
+      const element = document.createElement("option");
+      element.value = option;
+      element.textContent = option;
+      if (option === String(setting.value)) element.selected = true;
+      select.appendChild(element);
+    }
+    input = select;
+  } else {
+    const box = document.createElement("input");
+    box.type = setting.control === "number" ? "number" : "text";
+    box.id = id;
+    box.setAttribute("data-setting", setting.key);
+    box.setAttribute("data-control", setting.control);
+    if (setting.control === "number") {
+      if (setting.minimum !== undefined) box.min = String(setting.minimum);
+      if (setting.maximum !== undefined) box.max = String(setting.maximum);
+      box.value = String(setting.value ?? "");
+    } else {
+      box.value = String(setting.value ?? "");
+    }
+    input = box;
+  }
+
+  row.appendChild(input);
+  row.appendChild(configSaveButton(setting.key, "Save"));
+  return row;
+}
+
+/**
+ * The Save button for one setting.
+ *
+ * The value is read from the control at the moment of the click, so the
+ * message carries what the reader typed, not what was last rendered.
+ */
+function configSaveButton(key: string, label: string): HTMLElement {
+  const button = document.createElement("button");
+  button.className = "button config-save";
+  button.setAttribute("data-command", "saveSetting");
+  button.setAttribute("data-value", key);
+  button.textContent = label;
+  return button;
+}
+
+/**
+ * The credentials block: the notice, and a form to set or clear each key.
+ *
+ * The notice is the point of this block. A reader who opens a settings
+ * screen expects to see their key, and the honest answer is that they
+ * cannot: the key is in the OS keychain, and the extension never puts it
+ * anywhere the user can read it back. Saying that plainly is better than
+ * showing an empty field that looks like a mistake.
  */
 function renderConfigCredentials(): HTMLElement {
   const wrapper = document.createElement("div");
@@ -1385,59 +1657,117 @@ function renderConfigCredentials(): HTMLElement {
     "in the operating system's secret store (the OS keychain), not in " +
     "settings.json and not on disk in this extension's folder. The extension " +
     "reads them from there at request time, and it never sends them anywhere " +
-    "except to your own server. You cannot read them back from here, by " +
+    "except to your own server. You cannot read a key back from here, by " +
     "design.";
   wrapper.appendChild(notice);
 
-  const table = document.createElement("table");
-  table.className = "quota-table config-table";
-  table.appendChild(headRow(["Credential", "Status", "Stored in", "Scope needed"]));
-
-  const body = document.createElement("tbody");
   for (const credential of [
-    {
-      name: "API key",
-      state: state.config.apiKey,
-      scope: "ordinary key with allowUsageCommand",
-    },
-    {
-      name: "Admin key",
-      state: state.config.adminKey,
-      scope: "manage or admin (optional)",
-    },
+    { which: "apiKey" as const, name: "API key", state: state.config.apiKey },
+    { which: "adminKey" as const, name: "Admin key", state: state.config.adminKey },
   ]) {
-    const tr = document.createElement("tr");
-
-    const nameCell = document.createElement("td");
-    nameCell.textContent = credential.name;
-    tr.appendChild(nameCell);
-
-    const statusCell = document.createElement("td");
-    statusCell.className = credential.state.set ? "config-set" : "config-unset";
-    statusCell.textContent = credential.state.set ? "set" : "not set";
-    tr.appendChild(statusCell);
-
-    const storeCell = document.createElement("td");
-    storeCell.textContent = "OS keychain";
-    tr.appendChild(storeCell);
-
-    const scopeCell = document.createElement("td");
-    scopeCell.textContent = credential.scope;
-    tr.appendChild(scopeCell);
-
-    body.appendChild(tr);
+    wrapper.appendChild(renderConfigCredentialField(credential.which, credential.name, credential.state));
   }
-  table.appendChild(body);
-  wrapper.appendChild(table);
+
+  return wrapper;
+}
+
+/** One credential: its status, a box to paste a key into, and a clear button. */
+function renderConfigCredentialField(
+  which: "apiKey" | "adminKey",
+  name: string,
+  credential: CredentialState,
+): HTMLElement {
+  const field = document.createElement("div");
+  field.className = "config-field";
+  field.setAttribute("data-credential-field", which);
+
+  const label = document.createElement("label");
+  label.className = "config-label";
+  label.setAttribute("for", `credential-${which}`);
+  label.textContent = name;
+
+  const status = document.createElement("span");
+  status.className = credential.set ? "config-set" : "config-unset";
+  status.textContent = credential.set ? `set (${credential.hint})` : "not set";
+  label.appendChild(status);
+
+  field.appendChild(label);
+
+  const row = document.createElement("div");
+  row.className = "config-control-row";
+
+  const input = document.createElement("input");
+  input.type = "password";
+  input.id = `credential-${which}`;
+  input.placeholder = "Paste a key, then save";
+  input.autocomplete = "off";
+  input.setAttribute("data-credential-input", which);
+  row.appendChild(input);
+
+  const save = document.createElement("button");
+  save.className = "button config-save";
+  save.setAttribute("data-command", "saveCredential");
+  save.setAttribute("data-value", which);
+  save.textContent = "Save";
+  row.appendChild(save);
+
+  if (credential.set) {
+    const clear = document.createElement("button");
+    clear.className = "button config-save";
+    clear.setAttribute("data-command", "clearCredential");
+    clear.setAttribute("data-value", which);
+    clear.textContent = "Clear";
+    row.appendChild(clear);
+  }
+
+  field.appendChild(row);
+
+  const meta = document.createElement("div");
+  meta.className = "config-meta";
+  const scope = document.createElement("span");
+  scope.className = "config-scope-of";
+  scope.textContent = credential.scopeNeeded;
+  meta.appendChild(scope);
+  field.appendChild(meta);
+
+  const error = state.config.errors[which];
+  if (error) {
+    const message = document.createElement("div");
+    message.className = "config-error";
+    message.setAttribute("role", "alert");
+    message.textContent = error;
+    field.appendChild(message);
+  }
+
+  return field;
+}
+
+/**
+ * The footer: a link to VS Code's own Settings editor.
+ *
+ * The Settings editor is the authoritative one. It knows about scopes,
+ * language overrides, and every key the extension might add later. The
+ * form here is the fast path; this is the escape hatch.
+ */
+function renderConfigFooter(): HTMLElement {
+  const footer = document.createElement("div");
+  footer.className = "config-footer";
+
+  const link = document.createElement("button");
+  link.className = "button";
+  link.setAttribute("data-command", "openSettings");
+  link.textContent = "Open in Settings editor";
+  footer.appendChild(link);
 
   const note = document.createElement("div");
   note.className = "section-note";
   note.textContent =
-    "Set or clear a key with the commands Omni Monitor: Set API Key, " +
-    "Omni Monitor: Set Admin Key, and Omni Monitor: Clear Stored Keys.";
-  wrapper.appendChild(note);
+    "The Settings editor is the authoritative view. It shows every setting, " +
+    "including any added after this release, and it handles scopes and " +
+    "language overrides.";
+  footer.appendChild(note);
 
-  return wrapper;
+  return footer;
 }
 
 /**
@@ -1455,15 +1785,19 @@ function loadConfig(): void {
 /**
  * Normalize a credential answer.
  *
- * The host sends `{ set, hint }`. Anything else is treated as "not set",
- * because a malformed answer must not be read as a key being present.
+ * The host sends `{ set, hint, scopeNeeded }`. Anything else is treated
+ * as "not set", because a malformed answer must not be read as a key
+ * being present.
  */
 function normalizeCredential(value: unknown): CredentialState {
-  if (!value || typeof value !== "object") return { set: false, hint: "" };
-  const raw = value as { set?: unknown; hint?: unknown };
+  if (!value || typeof value !== "object") {
+    return { set: false, hint: "", scopeNeeded: "" };
+  }
+  const raw = value as { set?: unknown; hint?: unknown; scopeNeeded?: unknown };
   return {
     set: raw.set === true,
     hint: typeof raw.hint === "string" ? raw.hint : "",
+    scopeNeeded: typeof raw.scopeNeeded === "string" ? raw.scopeNeeded : "",
   };
 }
 

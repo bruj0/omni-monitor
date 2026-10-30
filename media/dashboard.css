@@ -410,47 +410,129 @@ body {
 
 /* ============= config view ============= */
 
-/* The config tables use the same table styles as the rest of the panel, so
- * they sit on the shared .quota-table rules. */
-.config-table {
-  width: 100%;
-  border-collapse: collapse;
+/* The scope picker: where an edit goes. It is the same choice the Settings
+ * editor offers, so it uses the same chip group. */
+.config-scope {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+
+.config-scope-label {
   font-size: 11px;
-  margin-top: 8px;
-}
-
-.config-table th {
-  text-align: left;
-  padding: 4px 6px;
-  border-bottom: 1px solid var(--vscode-panel-border);
   color: var(--vscode-descriptionForeground);
-  font-weight: 600;
 }
 
-.config-table td {
-  padding: 3px 6px;
+/* The scope chips look like the provider chips but are their own group:
+ * the CDP check asserts that the provider group's label is "Provider",
+ * and two groups sharing a class made that claim ambiguous. */
+.config-scope-group {
+  display: flex;
+}
+
+.config-scope-group .provider-chip {
+  flex: none;
+}
+
+/* One setting per row: label, control, then the description and the
+ * source. The label is the setting key, because that is what the reader
+ * sees in Settings and what they will search for. */
+.config-field {
+  padding: 8px 0;
   border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.config-field:last-child {
+  border-bottom: none;
+}
+
+.config-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+/* The "modified" badge. It marks the settings that differ from the
+ * extension's default, which is the thing a reader wants to find. */
+.config-modified {
+  font-size: 9px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  color: var(--vscode-badge-foreground);
+  background-color: var(--vscode-badge-background);
+}
+
+.config-control-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The inputs use the theme's own input colours, so they look like every
+ * other input in the editor. */
+.config-control-row input[type="text"],
+.config-control-row input[type="number"],
+.config-control-row input[type="password"],
+.config-control-row select {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-family: inherit;
+  color: var(--vscode-input-foreground);
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  border-radius: 2px;
+}
+
+.config-control-row input:focus,
+.config-control-row select:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.config-control-row input[type="checkbox"] {
+  flex: none;
+  margin: 0;
+}
+
+.config-control-row .config-save {
+  flex: none;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 320px;
 }
 
-.config-table tbody tr:hover {
-  background-color: var(--vscode-list-hoverBackground);
+.config-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
 }
 
-/* The setting key is an identifier, not prose: it must not wrap and it must
- * not be truncated, or the reader cannot read what they are looking at. */
-.config-key {
-  font-family: var(--vscode-editor-font-family, monospace);
-  white-space: nowrap !important;
-  max-width: none !important;
+.config-scope-of {
+  font-size: 10px;
+  opacity: 0.8;
 }
 
-/* The effective value can be long — a URL, say — so it gets the room. */
-.config-value {
-  max-width: none !important;
+/* The message from a failed edit, next to the control that failed. */
+.config-error {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--vscode-errorForeground);
+}
+
+.config-footer {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--vscode-panel-border);
 }
 
 /* The credential status. Green for set, muted for not set. Both use theme
