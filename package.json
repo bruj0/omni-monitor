@@ -41,11 +41,9 @@
   "main": "./dist/extension.js",
   "scripts": {
     "build": "tsc -p ./ && node scripts/copy-webview.js",
-    "watch": "node scripts/watch-all.js",
     "test": "node --test test/",
     "typecheck": "tsc -p ./ --noEmit",
-    "vscode:prepublish": "npm run build",
-    "cdp:cards": "node scripts/check-webview.js"
+    "vscode:prepublish": "npm run build"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",

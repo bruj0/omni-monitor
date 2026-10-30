@@ -1,6 +1,7 @@
 # The downstream repo carries only release files, so the only
 # exclusions needed are the build outputs and the sources that are shipped
 # compiled.
+.vscode/**
 src/**
 test/**
 scripts/**
@@ -9,6 +10,9 @@ tsconfig*.json
 **/*.ts
 node_modules/**
 node_modules/.bin/**
+.gitignore
+.gitattributes
+.github/**
 
 # Compiled but not loaded: the webview ships as the esbuild bundle in
 # media/dashboard.js.

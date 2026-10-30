@@ -1,5 +1,6 @@
 # Downstream is a build artifact of the upstream repo.
-# node_modules/
+node_modules/
+dist/
 *.vsix
 media/dashboard.js
 .env
