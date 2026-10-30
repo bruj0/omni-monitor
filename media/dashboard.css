@@ -1,0 +1,643 @@
+/* Dashboard styling.
+ *
+ * Mirrors GCMP's src/ui/usagesView/style.less structure and its class names:
+ * container, sidebar, content, chart-section, chart-section-title,
+ * empty-message, loading-overlay, summary-cards, donut-table, date-list,
+ * date-item, button. Colours are VS Code theme variables throughout, which is
+ * why this follows the user's theme automatically.
+ */
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
+
+body {
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-editor-background);
+  overflow: hidden;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============= header ============= */
+
+.header {
+  flex: none;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.subtitle {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  flex: 1;
+}
+
+/* ============= buttons ============= */
+
+.button {
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: none;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ============= view mode toggle ============= */
+
+/* A segmented pair, not a dropdown: two modes, both worth naming.
+ * The buttons sit between the subtitle and Refresh, and the subtitle's
+ * flex:1 is what pushes them to the right edge. */
+.view-toggle {
+  flex: none;
+  display: flex;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.view-toggle-button {
+  background-color: transparent;
+  color: var(--vscode-descriptionForeground);
+  border: none;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.view-toggle-button + .view-toggle-button {
+  border-left: 1px solid var(--vscode-panel-border);
+}
+
+.view-toggle-button:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+  color: var(--vscode-foreground);
+}
+
+.view-toggle-button.active {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+  font-weight: 600;
+}
+
+.view-toggle-button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+/* ============= summary cards ============= */
+
+.summary-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 16px;
+}
+
+.card {
+  flex: 1 1 160px;
+  min-width: 150px;
+  padding: 10px 12px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 3px;
+  background-color: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+}
+
+.card-title {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 4px;
+}
+
+.card-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--vscode-charts-blue);
+}
+
+.card-detail {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  margin-top: 2px;
+}
+
+/* ============= container: sidebar + content ============= */
+
+.container {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.sidebar {
+  width: 110px;
+  flex: none;
+  border-right: 1px solid var(--vscode-panel-border);
+  background-color: var(--vscode-sideBar-background);
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.date-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.date-item {
+  background: none;
+  border: none;
+  color: var(--vscode-foreground);
+  text-align: left;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.date-item:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.date-item.active {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  min-width: 0;
+}
+
+/* ============= chart sections ============= */
+
+.chart-section {
+  margin-bottom: 18px;
+  min-width: 0;
+}
+
+.chart-section-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+}
+
+/* Fixed height on the wrapper is what keeps chart.js from rendering at
+ * zero height inside a collapsed panel. Do not remove. */
+.chart-wrapper {
+  position: relative;
+  height: 220px;
+  width: 100%;
+}
+
+.chart-wrapper-short {
+  height: 180px;
+}
+
+/* ============= tables ============= */
+
+.donut-table,
+.quota-table,
+.records-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  margin-top: 8px;
+}
+
+.donut-table th,
+.quota-table th,
+.records-table th {
+  text-align: left;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  color: var(--vscode-descriptionForeground);
+  font-weight: 600;
+}
+
+.donut-table td,
+.quota-table td,
+.records-table td {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+}
+
+.donut-table tbody tr:hover,
+.quota-table tbody tr:hover,
+.records-table tbody tr:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.pager-label {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* The first column is the connection's own name, which is what the reader
+ * looks for; the numeric columns are right-aligned so a column of costs can
+ * be scanned without re-reading the header. */
+.connection-table td:not(:first-child):not(:nth-child(2)),
+.connection-table th:not(:first-child):not(:nth-child(2)) {
+  text-align: right;
+}
+
+/* A configured connection with no traffic in the selected range. Dimmed
+ * rather than hidden, and still in its usual row. */
+.connection-table tbody tr.connection-idle td {
+  color: var(--vscode-disabledForeground, var(--vscode-descriptionForeground));
+}
+
+/* The provider drill-down: a chip per connection, then either every row or
+ * one provider's detail. The chips wrap because a server can configure more
+ * connections than fit on one line in a narrow panel. */
+.provider-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  flex-wrap: wrap;
+}
+
+/* The word "Provider" in front of the chips. Without it the bar reads as a row
+ * of unrelated buttons, because the chips are slugs and a slug is not
+ * self-explanatory. */
+.provider-bar-label {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--vscode-descriptionForeground);
+}
+
+.provider-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.provider-chip {
+  background-color: transparent;
+  color: var(--vscode-descriptionForeground);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 2px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.provider-chip:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+  color: var(--vscode-foreground);
+}
+
+.provider-chip.active {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+  font-weight: 600;
+}
+
+.provider-chip:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+/* The connection name is a button so the drill-down is keyboard-reachable.
+ * Styled as a link, not a button: it sits inside a table cell. */
+.connection-name-button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--vscode-textLink-foreground);
+  cursor: pointer;
+  text-align: left;
+}
+
+.connection-name-button:hover {
+  text-decoration: underline;
+}
+
+.connection-name-button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.detail-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.detail-stat {
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 2px;
+  padding: 6px 10px;
+  min-width: 88px;
+}
+
+.detail-stat-label {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--vscode-descriptionForeground);
+}
+
+.detail-stat-value {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.detail-heading {
+  margin: 6px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Four columns, so every column after the model name is a number. The shared
+ * .connection-table rule skips column 2, which is a name in THAT table. */
+.provider-model-table td:not(:first-child),
+.provider-model-table th:not(:first-child) {
+  text-align: right;
+}
+
+.section-note {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* ============= request log view ============= */
+
+/* The log table takes the full width: the range sidebar answers questions
+ * about aggregates, and a log is read one row at a time. */
+.logs-section {
+  padding: 12px 16px;
+}
+
+.logs-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 8px 0 10px;
+}
+
+.logs-filters {
+  display: flex;
+  gap: 4px;
+}
+
+/* Deliberately NOT .provider-chip: the CDP contract counts
+ * `.provider-chip[aria-pressed="true"]` and expects exactly one, so a second
+ * pressed chip class would make that claim lie. */
+.log-chip {
+  background-color: transparent;
+  color: var(--vscode-descriptionForeground);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 2px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.log-chip:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+  color: var(--vscode-foreground);
+}
+
+.log-chip.active {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+  font-weight: 600;
+}
+
+.log-chip:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.logs-search {
+  flex: 1 1 140px;
+  min-width: 120px;
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  border-radius: 2px;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-family: inherit;
+}
+
+.logs-search:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.call-log-table td,
+.call-log-table th {
+  white-space: nowrap;
+}
+
+/* The model column is the only one that may be long, so it takes the slack
+ * and ellipsises; the numeric columns stay narrow. */
+.call-log-table td:nth-child(4) {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.call-log-table td:nth-child(5),
+.call-log-table td:nth-child(6),
+.call-log-table th:nth-child(5),
+.call-log-table th:nth-child(6) {
+  text-align: right;
+}
+
+.call-log-row.status-error td {
+  background-color: rgba(244, 71, 71, 0.08);
+}
+
+.log-time-button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  color: var(--vscode-textLink-foreground);
+  cursor: pointer;
+}
+
+.log-time-button:hover {
+  text-decoration: underline;
+}
+
+.log-time-button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+/* A status badge, as the server's own page renders it. */
+.log-status {
+  display: inline-block;
+  min-width: 34px;
+  padding: 0 5px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.log-status-ok {
+  background-color: var(--vscode-charts-green, #3fa45b);
+  color: #0b1a10;
+}
+
+.log-status-error {
+  background-color: var(--vscode-charts-red, #e5534b);
+  color: #fff;
+}
+
+.log-status-pending {
+  background-color: var(--vscode-charts-yellow, #d7ba7d);
+  color: #241c07;
+}
+
+.log-status-other {
+  background-color: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+}
+
+/* The expanded detail: label/value pairs, two columns, no table. */
+.call-log-detail-row td {
+  background-color: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--vscode-panel-border);
+  padding: 8px 10px 10px;
+}
+
+.log-detail {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 10px;
+  margin: 0;
+  font-size: 11px;
+}
+
+.log-detail dt {
+  color: var(--vscode-descriptionForeground);
+}
+
+.log-detail dd {
+  margin: 0;
+  word-break: break-all;
+}
+
+/* ============= empty and loading ============= */
+
+.empty-message {
+  padding: 14px;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.empty-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+  margin-bottom: 6px;
+}
+
+.error-message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.loading-overlay {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.loading-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--vscode-panel-border);
+  border-top-color: var(--vscode-charts-blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}

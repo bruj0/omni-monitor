@@ -1,0 +1,183 @@
+{
+  "name": "omni-monitor",
+  "displayName": "Omni Monitor — API Quota Dashboard",
+  "description": "Read-only usage monitor for OmniRoute and OpenAI-compatible API gateways: quota remaining in the status bar, plus a usage dashboard.",
+  "version": "0.1.0",
+  "publisher": "bruj0",
+  "license": "MIT",
+  "icon": "assets/icon.png",
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+  "homepage": "https://github.com/bruj0/omni-monitor#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bruj0/omni-monitor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bruj0/omni-monitor/issues"
+  },
+  "engines": {
+    "vscode": "^1.104.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "omniroute",
+    "llm",
+    "usage",
+    "quota",
+    "monitor",
+    "dashboard",
+    "openai-compatible",
+    "api-usage"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "scripts": {
+    "build": "tsc -p ./ && node scripts/copy-webview.js",
+    "watch": "node scripts/watch-all.js",
+    "test": "node --test test/",
+    "typecheck": "tsc -p ./ --noEmit",
+    "vscode:prepublish": "npm run build",
+    "cdp:cards": "node scripts/check-webview.js"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/node": "^22.10.2",
+    "@types/vscode": "^1.104.0",
+    "chart.js": "^4.4.7",
+    "chrome-remote-interface": "^0.34.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.7.2"
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "omniMonitor",
+          "title": "Omni Monitor",
+          "icon": "assets/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "omniMonitor": [
+        {
+          "type": "webview",
+          "id": "omniMonitor.dashboard",
+          "name": "Usage"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "omniMonitor.openDashboard",
+        "title": "Open Dashboard",
+        "category": "Omni Monitor"
+      },
+      {
+        "command": "omniMonitor.openServerDashboard",
+        "title": "Open OmniRoute Dashboard",
+        "category": "Omni Monitor"
+      },
+      {
+        "command": "omniMonitor.refresh",
+        "title": "Refresh",
+        "category": "Omni Monitor",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "omniMonitor.setApiKey",
+        "title": "Set API Key",
+        "category": "Omni Monitor"
+      },
+      {
+        "command": "omniMonitor.setAdminKey",
+        "title": "Set Admin Key (dashboard)",
+        "category": "Omni Monitor"
+      },
+      {
+        "command": "omniMonitor.clearKeys",
+        "title": "Clear Stored Keys",
+        "category": "Omni Monitor"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "omniMonitor.refresh",
+          "when": "view == omniMonitor.dashboard",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Omni Monitor",
+      "properties": {
+        "omniMonitor.baseUrl": {
+          "type": "string",
+          "default": "http://localhost:20128",
+          "description": "OmniRoute server root. A trailing /v1 is stripped."
+        },
+        "omniMonitor.refreshSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 15,
+          "description": "Poll interval for the status bar quota."
+        },
+        "omniMonitor.statusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the quota status bar item."
+        },
+        "omniMonitor.statusBarMode": {
+          "type": "string",
+          "default": "worst",
+          "enum": [
+            "worst",
+            "sum"
+          ],
+          "description": "worst shows the lowest remaining percentage across connections."
+        },
+        "omniMonitor.alerts": {
+          "type": "boolean",
+          "default": true,
+          "description": "Notify once when quota crosses a threshold."
+        },
+        "omniMonitor.warnAtPercent": {
+          "type": "number",
+          "default": 80,
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Warn when this percent of quota has been used."
+        },
+        "omniMonitor.critAtPercent": {
+          "type": "number",
+          "default": 95,
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Critical alert when this percent of quota has been used."
+        },
+        "omniMonitor.defaultRange": {
+          "type": "string",
+          "default": "30d",
+          "enum": [
+            "1d",
+            "7d",
+            "30d",
+            "90d",
+            "ytd",
+            "all"
+          ],
+          "description": "Range the dashboard opens on."
+        }
+      }
+    }
+  }
+}

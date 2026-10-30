@@ -1,0 +1,20 @@
+# The downstream repo carries only release files, so the only
+# exclusions needed are the build outputs and the sources that are shipped
+# compiled.
+src/**
+test/**
+scripts/**
+tsconfig*.json
+**/*.map
+**/*.ts
+node_modules/**
+node_modules/.bin/**
+
+# Compiled but not loaded: the webview ships as the esbuild bundle in
+# media/dashboard.js.
+dist/webview/**
+
+# Orphaned at runtime: src/core/connections.ts is imported only by the
+# webview, which gets it inlined into media/dashboard.js by esbuild. The
+# compiled file stays in dist/ because the test suite requires it.
+dist/core/connections.js
