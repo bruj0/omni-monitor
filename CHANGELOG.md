@@ -23,6 +23,9 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The public README no longer names a private network address as its
   configuration example, and the source comments no longer name the
   machine the wire shapes were measured on.
+- The test script no longer fails on Node 22, where `node --test test/`
+  treats the directory as a module path. It now runs with no path
+  argument, which scans for test files and works on every supported Node.
 
 ## [0.1.0] — 2026-10-30
 

@@ -41,7 +41,7 @@
   "main": "./dist/extension.js",
   "scripts": {
     "build": "tsc -p ./ && node scripts/copy-webview.js",
-    "test": "node --test test/",
+    "test": "node --test",
     "typecheck": "tsc -p ./ --noEmit",
     "vscode:prepublish": "npm run build",
     "reload": "node scripts/reload.mjs"
