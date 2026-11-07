@@ -1,7 +1,9 @@
 # Omni Monitor — API Quota Dashboard
 
-A read-only VS Code monitor for [OmniRoute](https://github.com/diegosouzapw/OmniRoute):
-quota remaining as a percentage in the status bar, plus a usage dashboard.
+A VS Code monitor for [OmniRoute](https://github.com/diegosouzapw/OmniRoute) —
+a third-party extension, not affiliated with or endorsed by the OmniRoute
+project: quota remaining as a percentage in the status bar, plus a usage
+dashboard.
 
 **It does not serve models.** No `languageModelChatProviders`, no chat
 participants, nothing in the Copilot model picker. If you use GCMP or
@@ -45,6 +47,9 @@ code --install-extension bruj0.omni-monitor
 The extension also publishes to Open VSX, so it works on Cursor, Windsurf,
 VSCodium, Theia, and code-server.
 
+Free and open source, MIT licensed. No account, no subscription, no
+telemetry — the extension talks to your server and nothing else.
+
 ## Configure
 
 Two keys, both stored in the OS keychain. Neither ever goes in
@@ -61,7 +66,7 @@ dashboard shows a setup prompt.
 Then point it at your server:
 
 ```json
-{ "omniMonitor.baseUrl": "http://10.0.0.77:20128" }
+{ "omniMonitor.baseUrl": "http://your-omni-route-host:20128" }
 ```
 
 A trailing `/v1` is stripped for you.

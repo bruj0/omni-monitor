@@ -39,7 +39,7 @@ export async function setApiKeyCommand(context: vscode.ExtensionContext): Promis
 export async function setAdminKeyCommand(context: vscode.ExtensionContext): Promise<void> {
   const value = await promptForKey(
     "Omni Monitor: Set Admin Key",
-    "Optional. Used read-only by the dashboard. It needs the manage or admin scope.",
+    "Optional. Used by the dashboard only. It needs the manage or admin scope.",
   );
   if (value === undefined) return;
 

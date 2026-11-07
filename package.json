@@ -1,8 +1,8 @@
 {
   "name": "omni-monitor",
   "displayName": "Omni Monitor — API Quota Dashboard",
-  "description": "Read-only usage monitor for OmniRoute and OpenAI-compatible API gateways: quota remaining in the status bar, plus a usage dashboard.",
-  "version": "0.1.0",
+  "description": "Usage monitor for OmniRoute and OpenAI-compatible API gateways: quota remaining in the status bar, plus a usage dashboard.",
+  "version": "0.1.1",
   "publisher": "bruj0",
   "license": "MIT",
   "icon": "assets/icon.png",

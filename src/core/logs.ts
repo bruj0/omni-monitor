@@ -6,7 +6,7 @@
  * that returns one object per request with the correlation id, the token
  * counts, the duration and the status, so it is the only possible source.
  *
- * Verified 2026-10-30 against OmniRoute at 10.0.0.77:20128:
+ * Verified 2026-10-30 against a live OmniRoute instance:
  *
  *   row keys -> id, timestamp, provider, providerDisplay, model,
  *               requestedModel, account, apiKeyName, apiKeyId, status,

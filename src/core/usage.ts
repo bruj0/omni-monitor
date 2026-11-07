@@ -1,8 +1,8 @@
 /**
  * Types and parsing for OmniRoute's self-service usage endpoint.
  *
- * Wire shapes verified 2026-10-16 against a live OmniRoute at
- * 10.0.0.77:20128. Keep these aligned with
+ * Wire shapes verified 2026-10-16 against a live OmniRoute instance.
+ * Keep these aligned with
  * `src/lib/usage/internalUsageCommand.ts` in the OmniRoute repo.
  */
 

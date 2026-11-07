@@ -5,7 +5,7 @@ const frame = require("../dist/core/frame.js");
 const headers = (map) => ({ get: (name) => (name in map ? map[name] : null) });
 
 test("live OmniRoute headers are measured as blocked", () => {
-  // Values captured from 10.0.0.77:20128 on 2026-10-16.
+  // Values captured from a live OmniRoute on 2026-10-16.
   const h = headers({
     "x-frame-options": "DENY",
     "content-security-policy":

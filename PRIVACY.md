@@ -1,7 +1,7 @@
 # Privacy
 
-Omni Monitor is a local, read-only monitor for an API gateway you run
-yourself. It sends nothing to the extension publisher.
+Omni Monitor is a local monitor for an API gateway you run yourself. It
+sends nothing to the extension publisher.
 
 ## What the extension collects
 

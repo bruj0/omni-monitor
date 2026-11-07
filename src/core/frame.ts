@@ -1,10 +1,10 @@
 /**
  * Framing probe logic, kept pure so it is testable without a VS Code host.
  *
- * WHY EMBEDDING USUALLY FAILS, measured 2026-10-16 against
- * 10.0.0.77:20128:
+ * WHY EMBEDDING USUALLY FAILS, measured 2026-10-16 against a live
+ * OmniRoute instance:
  *
- *   $ curl -sI http://10.0.0.77:20128/dashboard
+ *   $ curl -sI http://omni-route-host:20128/dashboard
  *   HTTP/1.1 307 Temporary Redirect
  *   Content-Security-Policy: ... frame-ancestors 'none'; ...
  *   X-Frame-Options: DENY

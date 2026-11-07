@@ -1,0 +1,131 @@
+name: Release
+
+# The Trusted Publishing policy on the Marketplace names this file and the
+# `production` environment. Both are exact strings: the policy binds to the
+# workflow *filename*, and a job that declares an environment which does not
+# exist fails outright. Do not rename this file or the environment without
+# recreating the policy on the publisher's Trusted Publishing page.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 0.1.0. Leave empty to use the tag.'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    # Only the downstream holds tags. The upstream is the working copy: it
+    # carries the dev profile and the agent-facing spec, and a release built
+    # from it would ship the wrong file set.
+    if: github.repository == 'bruj0/omni-monitor'
+    runs-on: ubuntu-latest
+
+    # The policy names this environment. It exists so that a publish can be
+    # gated on a human approval; the protection rules are set on the repo.
+    environment: production
+
+    permissions:
+      contents: write   # create the release and upload the asset
+      id-token: write   # required by `vsce publish --oidc`
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve version
+        id: version
+        run: |
+          set -euo pipefail
+          PKG=$(node -p "require('./package.json').version")
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ -n "$TAG" ] && [ "$TAG" != "$PKG" ]; then
+            echo "::error::tag v$TAG does not match package.json version $PKG"
+            exit 1
+          fi
+          echo "version=$PKG" >> "$GITHUB_OUTPUT"
+
+      - name: Tests
+        run: npm test
+
+      - name: Boundary check
+        # The extension must not register a model provider. This is the one
+        # acceptance test that matters most, and it is the only one that
+        # cannot be settled by reading the code.
+        run: |
+          set -euo pipefail
+          npx @vscode/vsce package --out "omni-monitor-${{ steps.version.outputs.version }}.vsix"
+          unzip -p "omni-monitor-${{ steps.version.outputs.version }}.vsix" extension/package.json | python3 -c "
+          import json, sys
+          c = json.load(sys.stdin)['contributes']
+          assert 'languageModelChatProviders' not in c, 'MUST NOT register a provider'
+          assert 'chatParticipants' not in c, 'MUST NOT register a chat participant'
+          print('PASS: no model provider in the packaged extension')
+          "
+
+      - name: Publish to the Marketplace
+        # The publisher comes from package.json and is `bruj0`: vsce sends it
+        # as `publisherName` in the OIDC exchange, and the `bruj0` Trusted
+        # Publishing policy is the one that must match.
+        run: npx @vscode/vsce publish --oidc --packagePath "omni-monitor-${{ steps.version.outputs.version }}.vsix"
+
+      - name: Publish to Open VSX
+        env:
+          # The secret is named OPENVSX in the repo; ovsx reads OVSX_PAT.
+          OVSX_PAT: ${{ secrets.OPENVSX }}
+          VSIX: omni-monitor-${{ steps.version.outputs.version }}.vsix
+        run: npx --yes ovsx publish --packagePath "$VSIX"
+
+      - name: Wait for the Open VSX version to become active
+        # Open VSX keeps a published version inactive until its asynchronous
+        # security scan completes, and ovsx returns before that. Without this
+        # step the job would report success for an extension nobody can
+        # install yet.
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          URL="https://open-vsx.org/api/bruj0/omni-monitor/$VERSION/file/bruj0.omni-monitor-$VERSION.vsix"
+          for i in $(seq 1 40); do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" -L "$URL")
+            if [ "$CODE" = "200" ]; then
+              echo "::notice::version $VERSION is live on Open VSX after $((i * 30))s"
+              exit 0
+            fi
+            echo "::notice::not active yet ($CODE), waiting 30s"
+            sleep 30
+          done
+          echo "::error::version $VERSION did not become active within 20 minutes"
+          exit 1
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ steps.version.outputs.version }}
+          VSIX: omni-monitor-${{ steps.version.outputs.version }}.vsix
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG already exists; uploading the asset only"
+            gh release upload "$TAG" "$VSIX" --clobber
+          else
+            gh release create "$TAG" "$VSIX" \
+              --title "Omni Monitor $TAG" \
+              --notes-file CHANGELOG.md
+          fi

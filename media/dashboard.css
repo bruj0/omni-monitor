@@ -34,6 +34,13 @@ body {
 #app {
   display: flex;
   flex-direction: column;
+  /* One scroll container for every view. Measured 2026-10-31 at the panel's
+   * default height: the Providers aggregate is 1133px inside an 801px panel
+   * and the Logs table is 1760px, and both were silently clipped by body's
+   * overflow: hidden. The scrollable element is the column itself, and the
+   * rows the reader needs while scrolling stay pinned below the header —
+   * see .header and .provider-bar. */
+  overflow-y: auto;
 }
 
 /* ============= header ============= */
@@ -45,6 +52,13 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  /* Pinned on top of #app's own scroll, so the view toggles and Refresh stay
+   * reachable with the page scrolled to its bottom. The background keeps the
+   * scrolled content from showing through. */
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: var(--vscode-editor-background);
 }
 
 .title {
@@ -162,7 +176,14 @@ body {
 /* ============= container: sidebar + content ============= */
 
 .container {
-  flex: 1;
+  /* Natural height, not flex: 1. As a flex child it collapsed to 0px the
+   * moment the sections above it were taller than the panel, which took the
+   * range sidebar and the trend and rank charts out of reach entirely
+   * (measured 2026-10-31: clientHeight 0, scrollHeight 24). At its own
+   * natural height it is part of the page the dashboard scrolls through.
+   * The inner overflow-y values become inert on the way — a container that
+   * is exactly its content's height never overflows. */
+  flex: none;
   display: flex;
   min-height: 0;
 }
@@ -310,6 +331,15 @@ body {
   padding: 6px 16px;
   border-bottom: 1px solid var(--vscode-panel-border);
   flex-wrap: wrap;
+  /* Pinned underneath the header on the dashboard's own scroll: the chips
+   * filter every section below, so a reader at the connections table wants
+   * to switch provider without scrolling back up. 44px is the header's
+   * measured height (10px padding top and bottom + 20px toggle rows + 1px
+   * border); a taller system font makes the header cover the gap. */
+  position: sticky;
+  top: 44px;
+  z-index: 1;
+  background-color: var(--vscode-editor-background);
 }
 
 /* The word "Provider" in front of the chips. Without it the bar reads as a row

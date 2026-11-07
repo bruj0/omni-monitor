@@ -8,7 +8,7 @@
  *
  * The rows come from `GET /api/usage/call-logs`, the only endpoint on this
  * server that carries a per-request timestamp AND the provider slug.
- * Verified 2026-10-30 on OmniRoute at 10.0.0.77:20128:
+ * Verified 2026-10-30 against a live OmniRoute instance:
  *
  *   row keys -> timestamp, provider ("synthetic"), tokens: { in, out }, id
  *   coverage -> ~228 rows/hour, so 24 h of history is roughly 5,500 rows

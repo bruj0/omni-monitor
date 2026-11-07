@@ -2,7 +2,7 @@
  * Types and shaping for OmniRoute's management analytics endpoint.
  *
  * Wire shapes verified 2026-10-16 against a live OmniRoute at
- * 10.0.0.77:20128 (`GET /api/usage/analytics?range=30d`). The envelope keys
+ * a live OmniRoute instance (`GET /api/usage/analytics?range=30d`). The envelope keys
  * match the server's own assembly in
  * `src/app/api/usage/analytics/route.ts`.
  */
