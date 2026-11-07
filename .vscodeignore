@@ -13,6 +13,13 @@ node_modules/.bin/**
 .gitignore
 .gitattributes
 .github/**
+.DS_Store
+
+# The screenshots are linked from the README as relative paths, and vsce
+# rewrites those to the public raw URL of the downstream repo. They are
+# served from the repository, not from inside the VSIX, so bundling them
+# would only make the download bigger.
+images/**
 
 # Compiled but not loaded: the webview ships as the esbuild bundle in
 # media/dashboard.js.

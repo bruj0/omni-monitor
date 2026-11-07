@@ -15,15 +15,15 @@ how models are routed.
 **Status bar** — a bar of the quota remaining, solid on the left for what is
 left and outlined for what is spent, with the same number as text. With no
 provider chosen it reads the smallest remaining percentage across every
-connection; otherwise one provider, chosen from the dashboard's Settings page:
+connection; otherwise one provider, chosen from the dashboard's Settings page.
 
-```
-$(layers) ▬▬▬▬▬▬▬▭▭▭ 68%
-```
+![The Omni Monitor status bar item](images/status-bar.png)
 
 Warns at 20% remaining, critical at 5%; the item's background turns yellow,
 then red. Hover for the reading the bar made, per-connection windows, reset
-countdowns, and your key's own daily and weekly spend.
+countdowns, and your key's own daily and weekly spend:
+
+![The status bar tooltip](images/status-bar-tooltip.png)
 
 **Dashboard** — an Activity Bar panel mirroring GCMP's `usagesView`:
 
@@ -34,6 +34,18 @@ countdowns, and your key's own daily and weekly spend.
 - recent requests, paged at 20
 
 All colours are VS Code theme variables, so it follows your theme.
+
+### The dashboard
+
+![The dashboard, showing the provider table and the hourly trend](images/dashboard-providers.png)
+
+![The dashboard summary cards and provider table](images/dashboard-summary.png)
+
+![Top models by requests, and the recent requests list](images/dashboard-charts.png)
+
+![The request log](images/dashboard-logs.png)
+
+![The settings page](images/dashboard-config.png)
 
 ## Install
 

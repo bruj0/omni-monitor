@@ -4,3 +4,7 @@ dist/
 *.vsix
 media/dashboard.js
 .env
+
+# macOS Finder metadata. It would otherwise be committed inside images/
+# and shipped in the release set.
+.DS_Store
