@@ -61,6 +61,11 @@ jobs:
           fi
           echo "version=$PKG" >> "$GITHUB_OUTPUT"
 
+      - name: Build
+        # The tests load the compiled output in dist/, so the build has to
+        # come first. `npm test` alone fails with MODULE_NOT_FOUND.
+        run: npm run build
+
       - name: Tests
         run: npm test
 
