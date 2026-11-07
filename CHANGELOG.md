@@ -7,6 +7,12 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.1.1] — 2026-11-07
 
+### Added
+
+- Screenshots in the README, so the Marketplace listing shows what the
+  dashboard and the status bar item look like. They are served from the
+  repository rather than bundled into the VSIX.
+
 ### Changed
 
 - The extension describes itself as a **monitor** rather than a "read-only"
