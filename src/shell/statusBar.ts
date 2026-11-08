@@ -7,7 +7,7 @@
  */
 
 import * as vscode from "vscode";
-import { formatResetIn, formatUsd, humanizeWindow, statusBarText } from "../core/format";
+import { formatResetIn, formatUsd, formatUsedTotal, humanizeWindow, statusBarText } from "../core/format";
 import {
   providerRead,
   severityFor,
@@ -292,7 +292,7 @@ function buildTooltip(state: Extract<StatusState, { kind: "ready" }>): vscode.Ma
       const pctText = pct === null ? (window.unlimited ? "unlimited" : "-") : `${pct}%`;
       const usedText =
         typeof window.used === "number" && typeof window.total === "number"
-          ? ` ${window.used}/${window.total}`
+          ? ` ${formatUsedTotal(window.used, window.total)}`
           : "";
       const reset = window.resetAt ? ` - resets in ${formatResetIn(window.resetAt)}` : "";
       md.appendMarkdown(`- ${humanizeWindow(key)}: **${pctText}**${usedText}${reset}\n`);

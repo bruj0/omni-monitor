@@ -50,6 +50,27 @@ export function humanizeWindow(key: string): string {
 }
 
 /**
+ * The used/total pair a quota window reports, as "8/100".
+ *
+ * The server sends floats that binary rounding makes ugly: a window of
+ * `used: 20.4` arrives as `20.400000000000002`, and printing that raw puts
+ * seventeen digits in a tooltip. So the used amount is rounded to at most
+ * two decimals, and a whole number loses its trailing zeros.
+ *
+ * A non-finite value yields "-" rather than "NaN", because the server can
+ * send a null where a number is expected and the tooltip must not lie.
+ */
+export function formatUsedTotal(used: number, total: number): string {
+  const clean = (value: number): string => {
+    if (!Number.isFinite(value)) return "-";
+    // toFixed, then strip the trailing zeros it pads. It rounds on the exact
+    // decimal value of the double, so 20.4 stays 20.4 and 26.4 stays 26.4.
+    return value.toFixed(2).replace(/\.?0+$/, "");
+  };
+  return `${clean(used)}/${clean(total)}`;
+}
+
+/**
  * The bar glyphs for the status bar.
  *
  * Ten segments: a solid rectangle for the percent remaining, an outlined one

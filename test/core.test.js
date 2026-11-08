@@ -129,6 +129,24 @@ test("formatResetIn reads like the server's terminal output", () => {
   assert.equal(format.formatResetIn("not-a-date", now), "unknown");
 });
 
+test("formatUsedTotal hides the binary rounding noise", () => {
+  assert.equal(format.formatUsedTotal(8, 100), "8/100");
+  // The server sends 20.4 as 20.400000000000002. Printing it raw put
+  // seventeen digits in the tooltip.
+  assert.equal(format.formatUsedTotal(20.400000000000002, 30), "20.4/30");
+  assert.equal(format.formatUsedTotal(26.4, 60), "26.4/60");
+  assert.equal(format.formatUsedTotal(0, 12), "0/12");
+  // 1.005 is stored as 1.00499999999999989, so it rounds down to 1. The
+  // point is that no seventeen-digit tail survives, not which way a value
+  // that sits exactly on a rounding boundary falls.
+  assert.equal(format.formatUsedTotal(1.005, 100), "1/100");
+  // A third decimal is dropped, not carried.
+  assert.equal(format.formatUsedTotal(1.239, 100), "1.24/100");
+  // A non-finite value must not print as NaN.
+  assert.equal(format.formatUsedTotal(NaN, 30), "-/30");
+  assert.equal(format.formatUsedTotal(20, Infinity), "20/-");
+});
+
 test("formatTokens compacts and formatUsd handles null", () => {
   assert.equal(format.formatTokens(1234), "1.2k");
   assert.equal(format.formatTokens(1234567), "1.2M");
