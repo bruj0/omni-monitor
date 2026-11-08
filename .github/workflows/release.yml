@@ -84,6 +84,27 @@ jobs:
           print('PASS: no model provider in the packaged extension')
           "
 
+      - name: Security audit
+        # The gate. Eleven groups of checks against the packaged artifact:
+        # the product boundary, the manifest fields, the listing documents,
+        # secrets and non-product files, obfuscation, hosts and telemetry,
+        # the webview CSP, log redaction, the README disclosures and SVGs.
+        #
+        # The script lives upstream, because the skills do not ship. It is
+        # fetched from the upstream repo at the tag being released, so the
+        # audit that runs is the audit that was reviewed.
+        #
+        # It exits non-zero on a failed check, which fails the job before
+        # anything is published.
+        env:
+          AUDIT: https://raw.githubusercontent.com/bruj0/omniroute-monitor-upstream/main/.agents/skills/omni-monitor-release/scripts/security-audit.sh
+          VSIX: omni-monitor-${{ steps.version.outputs.version }}.vsix
+        run: |
+          set -euo pipefail
+          curl -fsSL "$AUDIT" -o /tmp/security-audit.sh
+          chmod +x /tmp/security-audit.sh
+          /tmp/security-audit.sh --vsix "$VSIX"
+
       - name: Publish to the Marketplace
         # The publisher comes from package.json and is `bruj0`: vsce sends it
         # as `publisherName` in the OIDC exchange, and the `bruj0` Trusted

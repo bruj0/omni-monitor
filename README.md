@@ -260,3 +260,11 @@ arithmetic and the wire parsers testable without an editor.
 ## License
 
 MIT. See [LICENSE](./LICENSE).
+
+## Credits
+
+Framing probe adapted from
+[OmniCopilot](https://github.com/cheaper-inference/OmniCopilot) (MIT).
+Dashboard layout and interaction patterns read from
+[GCMP](https://github.com/VicBilibily/GCMP)'s `usagesView` and
+`multiDayView` (MIT).
