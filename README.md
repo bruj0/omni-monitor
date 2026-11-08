@@ -1,27 +1,21 @@
-# Omni Monitor — API Quota Dashboard
+# Omni Monitor: API Quota Dashboard
 
 Watch your [OmniRoute](https://github.com/cheaper-inference/OmniRoute) gateway
-from inside VS Code. Quota left, tokens spent, and every request — without
+from inside VS Code. Quota left, tokens spent, and every request without
 leaving the editor.
 
-**Omni Route** is a third-party extension. It is not affiliated with, nor
-endorsed by, the OmniRoute project.
 
-## Install
 
-<p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=bruj0.omni-monitor">
-    <img src="https://img.shields.io/badge/Visual%20Studio%20Marketplace-007ACC?style=flat-square" alt="Install on the Visual Studio Marketplace">
-  </a>
-  <a href="https://open-vsx.org/extension/bruj0/omni-monitor">
-    <img src="https://img.shields.io/badge/Open%20VSX-EB5A1C?style=flat-square&logo=eclipse" alt="Install on Open VSX">
-  </a>
-</p>
+## Easy install
+
+[![Visual Studio Marketplace](https://img.shields.io/badge/Visual%20Studio%20Marketplace-007ACC?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=bruj0.omni-monitor) [![Open VSX](https://img.shields.io/badge/Open%20VSX-EB5A1C?style=flat-square&logo=eclipse)](https://open-vsx.org/extension/bruj0/omni-monitor)
 
 <p align="center">
   <img src="images/dashboard-providers.png" width="656" alt="The Omni Monitor dashboard, showing the configured providers table and the hourly trend chart">
 </p>
 
+*Omni Monitor is a third-party extension. It is not affiliated with, nor
+endorsed by, the OmniRoute project.*
 
 ---
 
@@ -266,10 +260,3 @@ arithmetic and the wire parsers testable without an editor.
 ## License
 
 MIT. See [LICENSE](./LICENSE).
-
-## Credits
-
-Framing probe adapted from
-[OmniCopilot](https://github.com/diegosouzapw/OmniCopilot) (MIT). Dashboard
-layout and interaction patterns read from
-[GCMP](https://github.com/vicanent/gcmp)'s `usagesView` and `multiDayView`.
