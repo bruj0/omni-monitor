@@ -7,6 +7,17 @@ leaving the editor.
 **Omni Route** is a third-party extension. It is not affiliated with, nor
 endorsed by, the OmniRoute project.
 
+## Install
+
+<p align="center">
+  <a href="https://marketplace.visualstudio.com/items?itemName=bruj0.omni-monitor">
+    <img src="https://img.shields.io/badge/Visual%20Studio%20Marketplace-007ACC?style=flat-square" alt="Install on the Visual Studio Marketplace">
+  </a>
+  <a href="https://open-vsx.org/extension/bruj0/omni-monitor">
+    <img src="https://img.shields.io/badge/Open%20VSX-EB5A1C?style=flat-square&logo=eclipse" alt="Install on Open VSX">
+  </a>
+</p>
+
 <p align="center">
   <img src="images/dashboard-providers.png" width="656" alt="The Omni Monitor dashboard, showing the configured providers table and the hourly trend chart">
 </p>
@@ -162,15 +173,22 @@ code actually does, not what it promises.
 
 ## Install
 
-From the VS Code Marketplace, search for **Omni Monitor — API Quota Dashboard**,
-or run:
+The buttons at the top of this page install from the Visual Studio Marketplace
+or from Open VSX. From a terminal:
 
 ```bash
 code --install-extension bruj0.omni-monitor
 ```
 
-It is also on [Open VSX](https://open-vsx.org/extension/bruj0/omni-monitor), so
-it works on Cursor, Windsurf, VSCodium, Theia, and code-server.
+Open VSX is the default gallery for Cursor, Windsurf and VSCodium, so the same
+extension id installs there:
+
+```bash
+cursor --install-extension bruj0.omni-monitor
+codium --install-extension bruj0.omni-monitor
+windsurf --install-extension bruj0.omni-monitor
+code-server --install-extension bruj0.omni-monitor
+```
 
 Free and MIT licensed. No account, no subscription, no telemetry.
 
