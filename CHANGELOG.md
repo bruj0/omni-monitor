@@ -5,6 +5,28 @@ All notable changes to the Omni Monitor extension are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] — 2026-11-08
+
+### Changed
+
+- The README is rewritten around what the reader gets: install badges for
+  the Marketplace and Open VSX, the hero screenshot, install instructions
+  for the four editors that use Open VSX as their default gallery, and
+  every image sized to its content.
+- The third-party attribution is restored, with both URLs corrected. The
+  OmniCopilot repository moved to `cheaper-inference/OmniCopilot`, and
+  the GCMP repository moved to `VicBilibily/GCMP` — the old link was a
+  404.
+
+### Fixed
+
+- The status bar tooltip no longer prints the server's raw float
+  precision. A window reporting `used: 20.4` arrives as
+  `20.400000000000002` because of binary rounding, and the tooltip showed
+  seventeen digits. The used amount is now rounded to at most two
+  decimals, a whole number loses its trailing zeros, and a non-finite
+  value reads "-" rather than "NaN".
+
 ## [0.1.2] — 2026-11-07
 
 ### Added
